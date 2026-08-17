@@ -1,0 +1,22 @@
+{
+  "name": "change-info-streamer-bot",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "generate-import": "node scripts/generate-import.mjs",
+    "check": "tsc --noEmit",
+    "build": "npm run generate-import && npm run check && vite build && node scripts/copy-release.mjs",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@streamerbot/client": "2.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "22.15.30",
+    "typescript": "5.8.3",
+    "vite": "6.4.3",
+    "vite-plugin-singlefile": "2.2.0"
+  }
+}
