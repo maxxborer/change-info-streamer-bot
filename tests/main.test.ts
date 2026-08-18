@@ -181,6 +181,10 @@ describe("Stream Info HTML actions", () => {
     mockStreamerbot.state.youtube.broadcastId = "";
     document.body.innerHTML = '<div id="app"></div>';
     await boot();
+    const youtubeCard = document.querySelector<HTMLElement>('[data-platform="youtube"]');
+    expect(youtubeCard?.classList.contains("compact-unavailable")).toBe(true);
+    expect(youtubeCard?.querySelector(".card-body")).toBeNull();
+    expect(youtubeCard?.querySelector(".youtube-warning")).not.toBeNull();
     const links = document.querySelectorAll<HTMLButtonElement>('[data-action="open-link"]');
     expect(links[3]?.disabled).toBe(false);
     links[3]?.click();

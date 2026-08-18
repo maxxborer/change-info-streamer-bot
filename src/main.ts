@@ -259,8 +259,8 @@ function youtubeCategoryIcon(categoryId: string | undefined): string {
   return `<span class="category-image youtube-category-icon">${category?.iconSvg ?? FALLBACK_CATEGORY_SVG}</span>`;
 }
 
-function fieldRow(label: string, value: string | number | null | undefined, extra = ""): string {
-  return `<div class="info-row"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value || "—")}</strong>${extra}</div>`;
+function categorySummary(visual: string, name: string | null | undefined, id: string | null | undefined): string {
+  return `<div class="category-summary">${visual}<div><span>Категория</span><strong>${escapeHtml(name || "—")}</strong><small>ID ${escapeHtml(id || "—")}</small></div></div>`;
 }
 
 function renderTwitchCard(twitch: TwitchState): string {
@@ -272,11 +272,7 @@ function renderTwitchCard(twitch: TwitchState): string {
   return `<section class="platform-card ${status}${state.cardErrors.twitch ? " card-error" : ""}${state.cardEffects.twitch ? ` card-${state.cardEffects.twitch}` : ""}" data-platform="twitch">
     <div class="card-heading"><div>${platformLogo("twitch")}<div><h2>Twitch</h2><span>${escapeHtml(twitch.accountName || "Аккаунт не подключён")}</span></div></div><span class="live-badge ${status}">${status === "live" ? "В эфире" : status === "offline" ? "Не в эфире" : "Не подключён"}</span></div>
     ${loading ? '<div class="card-spinner" aria-label="Выполняется обновление"></div>' : ""}
-    <div class="card-body">
-      ${fieldRow("Название", twitch.title)}
-      <div class="category-row">${categoryImage(twitch.categoryImageUrl)}${fieldRow("Категория", twitch.categoryName)}${fieldRow("Twitch category ID", twitch.categoryId)}</div>
-      <div class="tags-section"><span>Теги</span>${tagsHtml(asStringArray(twitch.tags))}</div>
-    </div>
+    <div class="card-body"><div class="stream-title"><span>Название</span><strong>${escapeHtml(twitch.title || "—")}</strong></div><div class="stream-meta">${categorySummary(categoryImage(twitch.categoryImageUrl), twitch.categoryName, twitch.categoryId)}<div class="tags-section"><span>Теги</span>${tagsHtml(asStringArray(twitch.tags))}</div></div></div>
     <div class="card-footer"><div>${button("Изменить", "edit-twitch", { disabled: !twitch.connected || loading })}</div><div class="card-links">${iconButton("open-link", "Открыть стрим", renderIcon("external"), !streamUrl, ` data-url="${escapeHtml(streamUrl)}"`)}${iconButton("open-link", "Открыть дашборд", renderIcon("dashboard"), !dashboardUrl, ` data-url="${escapeHtml(dashboardUrl)}"`)}</div></div>
   </section>`;
 }
@@ -288,15 +284,12 @@ function renderYouTubeCard(youtube: YouTubeState): string {
   const id = youtube.broadcastId ?? "";
   const streamUrl = canEdit ? `https://www.youtube.com/watch?v=${encodeURIComponent(id)}` : "";
   const dashboardUrl = id ? `https://studio.youtube.com/video/${encodeURIComponent(id)}/livestreaming` : youtube.connected ? "https://studio.youtube.com/" : "";
-  return `<section class="platform-card ${status}${state.cardErrors.youtube ? " card-error" : ""}${state.cardEffects.youtube ? ` card-${state.cardEffects.youtube}` : ""}" data-platform="youtube">
+  const details = canEdit ? `<div class="card-body"><div class="stream-title"><span>Название</span><strong>${escapeHtml(youtube.title || "—")}</strong></div><div class="stream-meta">${categorySummary(youtubeCategoryIcon(youtube.categoryId), youtube.categoryName, youtube.categoryId)}<div class="tags-section"><span>Теги</span>${tagsHtml(asStringArray(youtube.tags))}</div></div></div>` : "";
+  return `<section class="platform-card ${status}${!canEdit ? " compact-unavailable" : ""}${state.cardErrors.youtube ? " card-error" : ""}${state.cardEffects.youtube ? ` card-${state.cardEffects.youtube}` : ""}" data-platform="youtube">
     <div class="card-heading"><div>${platformLogo("youtube")}<div><h2>YouTube</h2><span>${escapeHtml(youtube.accountName || "Аккаунт не подключён")}</span></div></div><span class="live-badge ${status}">${youtube.live ? "В эфире" : "Не запущен"}</span></div>
     ${!canEdit ? '<div class="youtube-warning">Стрим YouTube должен быть запущен</div>' : ""}
     ${loading ? '<div class="card-spinner" aria-label="Выполняется обновление"></div>' : ""}
-    <div class="card-body">
-      ${fieldRow("Название", youtube.title)}
-      <div class="category-row">${youtubeCategoryIcon(youtube.categoryId)}${fieldRow("Категория", youtube.categoryName)}${fieldRow("YouTube category ID", youtube.categoryId)}</div>
-      <div class="tags-section"><span>Теги</span>${tagsHtml(asStringArray(youtube.tags))}</div>
-    </div>
+    ${details}
     <div class="card-footer"><div>${button("Изменить", "edit-youtube", { disabled: !canEdit || loading })}</div><div class="card-links">${iconButton("open-link", "Открыть стрим", renderIcon("external"), !streamUrl, ` data-url="${escapeHtml(streamUrl)}"`)}${iconButton("open-link", "Открыть дашборд", renderIcon("dashboard"), !dashboardUrl, ` data-url="${escapeHtml(dashboardUrl)}"`)}</div></div>
   </section>`;
 }
@@ -353,7 +346,7 @@ function templatePanel(): string {
   const twitchTitle = titleFromTemplate(draft.twitchTemplate, draft.subtitle);
   const youtubeTitle = titleFromTemplate(draft.youtubeTemplate, draft.subtitle);
   return `<section class="template-panel" aria-labelledby="templates-title">
-    <div class="panel-heading"><div><span class="eyebrow">Общие настройки</span><h2 id="templates-title">Шаблоны</h2></div><span class="template-store">Streamer.bot</span></div>
+    <div class="panel-heading"><h2 id="templates-title">Шаблоны</h2><span class="template-store">Streamer.bot</span></div>
     <div class="template-grid">
       <label class="subtitle-field">Подзаголовок<input data-input="main-subtitle" value="${escapeHtml(draft.subtitle)}" placeholder="Например: Играем соло рейтинг" /></label>
       ${syntaxEditor("Шаблон Twitch", "main-twitch-template", draft.twitchTemplate)}
@@ -367,7 +360,7 @@ function templatePanel(): string {
 
 function presetPanel(): string {
   const actions = state.presetActions;
-  return `<section class="preset-panel" aria-labelledby="presets-title"><div class="panel-heading"><div><span class="eyebrow">Streamer.bot Actions</span><h2 id="presets-title">Пресеты</h2></div><span class="preset-count">${actions.length}</span></div>${actions.length ? `<div class="preset-list">${actions.map((preset) => button(state.runningPresetId === preset.id ? "Запускаем…" : preset.label, "run-preset", { className: "button preset-button", icon: uiIcon("play"), disabled: state.runningPresetId !== null, data: ` data-preset-id="${escapeHtml(preset.id)}" data-preset-name="${escapeHtml(preset.name)}"` })).join("")}</div>` : '<p class="panel-hint">Добавьте Action в группу <code>STREAM INFO</code> и назовите его <code>PRESET | Название игры</code>. Он появится здесь после обновления данных.</p>'}</section>`;
+  return `<section class="preset-panel" aria-labelledby="presets-title"><div class="panel-heading"><h2 id="presets-title">Пресеты</h2><span class="preset-count">${actions.length}</span></div>${actions.length ? `<div class="preset-list">${actions.map((preset) => button(state.runningPresetId === preset.id ? "Запускаем…" : preset.label, "run-preset", { className: "button preset-button", icon: uiIcon("play"), disabled: state.runningPresetId !== null, data: ` data-preset-id="${escapeHtml(preset.id)}" data-preset-name="${escapeHtml(preset.name)}"` })).join("")}</div>` : '<p class="panel-hint">Добавьте Action в группу <code>STREAM INFO</code> и назовите его <code>PRESET | Название игры</code>.</p>'}</section>`;
 }
 
 function editModal(): string {

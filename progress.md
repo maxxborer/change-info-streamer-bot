@@ -30,6 +30,14 @@
 - Fix: retain the source SVG attributes and replace only accessibility/class metadata. CSS remains responsible for the displayed size and icon colour.
 - Added a regression test that asserts both UI and brand SVGs retain their original `viewBox`.
 
+### OBS dock density pass
+
+- **Status:** complete
+- Rebuilt platform cards around the job of an OBS dock: the title is a single compact row; category and its ID share a summary; tags occupy the remaining row instead of reserving a large empty column.
+- A YouTube card without an active broadcast now shows only the launch warning plus its disabled/live actions and the still-available Studio button. It no longer displays an oversized collection of placeholder title/category/tag fields.
+- Reduced the template/preset panels to their working controls: one-line headings, shorter editor/previews, and smaller panel spacing. Templates remain directly editable on the main screen.
+- Added a UI assertion for the compact unavailable-YouTube state. Full isolated UI suite: 7 tests passed.
+
 ## 2026-08-18
 
 ### Import compatibility repair

@@ -24,6 +24,7 @@
 - `CPH.GetGlobalVar` and `CPH.SetGlobalVar` provide persistent Streamer.bot storage suitable for template and preset values. The Action API now uses them behind `getState`, `saveTemplates`, and `applyPreset`; HTML never receives Twitch credentials.
 - UI behavior is covered by Vitest and JSDOM with a mocked `@streamerbot/client`. These tests exercise all HTML commands without a connection to Streamer.bot or a mutation of Twitch/YouTube data.
 - OSS SVG assets require their source `viewBox` to remain on the root `<svg>` element. Replacing that element while adding CSS classes crops Lucide artwork; the decorator now preserves source rendering attributes and changes only class/accessibility metadata.
+- An OBS dock is a control surface, not a dashboard landing page: unavailable platform data must not reserve space for empty values. The offline YouTube variant now retains the actionable Studio control and warning while omitting unavailable stream fields.
 
 ## Resources
 
