@@ -283,7 +283,7 @@ function renderYouTubeCard(youtube: YouTubeState): string {
   const canEdit = Boolean(youtube.connected && youtube.live && youtube.broadcastId);
   const id = youtube.broadcastId ?? "";
   const streamUrl = canEdit ? `https://www.youtube.com/watch?v=${encodeURIComponent(id)}` : "";
-  const dashboardUrl = id
+  const dashboardUrl = canEdit
     ? `https://studio.youtube.com/video/${encodeURIComponent(id)}/livestreaming`
     : youtube.channelId
       ? `https://studio.youtube.com/channel/${encodeURIComponent(youtube.channelId)}/livestreaming/dashboard`

@@ -185,7 +185,7 @@ describe("Stream Info HTML actions", () => {
     mockStreamerbot.reset();
     mockStreamerbot.state.youtube.live = false;
     mockStreamerbot.state.youtube.status = "offline";
-    mockStreamerbot.state.youtube.broadcastId = "";
+    mockStreamerbot.state.youtube.broadcastId = "old-or-upcoming-broadcast";
     document.body.innerHTML = '<div id="app"></div>';
     await boot();
     const youtubeCard = document.querySelector<HTMLElement>('[data-platform="youtube"]');

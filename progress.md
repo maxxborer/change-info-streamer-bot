@@ -26,7 +26,7 @@
 
 - **Status:** complete
 - API Action version 3 now returns the YouTube channel ID alongside the monitored broadcast data.
-- The dashboard button opens the monitored broadcast's Studio page whenever its ID is known; without one, it opens `https://studio.youtube.com/channel/{USER_ID}/livestreaming/dashboard`.
+- The dashboard button opens the active broadcast's Studio page; in every non-live state it opens `https://studio.youtube.com/channel/{USER_ID}/livestreaming/dashboard`, preventing an old monitored broadcast from being opened by mistake.
 - Added tests for both destinations. The full isolated suite now has 8 passing tests.
 
 ### SVG icon rendering repair
