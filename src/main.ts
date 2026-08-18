@@ -63,6 +63,8 @@ interface AppState {
   runningPresetId: string | null;
   templatesSaving: boolean;
   templatesDirty: boolean;
+  subtitleSaving: boolean;
+  subtitleDirty: boolean;
   editForm: EditForm | null;
   allForm: AllForm | null;
   twitchResults: TwitchCategory[];
@@ -120,6 +122,8 @@ const state: AppState = {
   runningPresetId: null,
   templatesSaving: false,
   templatesDirty: false,
+  subtitleSaving: false,
+  subtitleDirty: false,
   editForm: null,
   allForm: null,
   twitchResults: [],
@@ -352,7 +356,7 @@ function renderMain(): string {
   const stream = state.stream;
   if (!stream) return `<main class="empty-state"><div class="loader"></div><p>${t("loading")}</p></main>`;
   const stamp = state.lastUpdated ? state.lastUpdated.toLocaleTimeString(localeTag[locale], { hour: "2-digit", minute: "2-digit", second: "2-digit" }) : "—";
-  return `<main class="content"><div class="templates-top">${templatePanel()}</div><div class="cards">${renderTwitchCard(stream.twitch)}${renderYouTubeCard(stream.youtube)}</div><div class="presets-below">${presetPanel()}</div><p class="updated-at">${t("updated")} ${escapeHtml(stamp)}</p></main>`;
+  return `<main class="content"><div class="subtitle-top">${subtitlePanel()}</div><div class="cards">${renderTwitchCard(stream.twitch)}${renderYouTubeCard(stream.youtube)}</div><div class="presets-below">${presetPanel()}</div><p class="updated-at">${t("updated")} ${escapeHtml(stamp)}</p></main>`;
 }
 
 function renderCategoryOption(category: TwitchCategory | YouTubeCategory, kind: Platform, scope: string): string {
@@ -390,25 +394,46 @@ function renderTemplateSource(template: string): string {
   return escapeHtml(template).replaceAll("%subtitle%", '<mark class="template-token">%subtitle%</mark>');
 }
 
-function syntaxEditor(label: string, input: "main-twitch-template" | "main-youtube-template", value: string): string {
+function syntaxEditor(label: string, input: "settings-twitch-template" | "settings-youtube-template", value: string): string {
   return `<label class="syntax-field"><span>${label}</span><span class="syntax-editor"><pre aria-hidden="true">${renderTemplateSource(value)}\n</pre><textarea data-input="${input}" spellcheck="false" rows="2" aria-label="${escapeHtml(label)}">${escapeHtml(value)}</textarea></span></label>`;
+}
+
+function subtitlePanel(): string {
+  const stream = state.stream;
+  const subtitle = state.templateDraft.subtitle;
+  const twitchTitle = titleFromTemplate(settings.twitchTemplate, subtitle);
+  const youtubeTitle = titleFromTemplate(settings.youtubeTemplate, subtitle);
+  const errors = [
+    ...(stream?.twitch.connected ? validateTwitch(twitchTitle, asStringArray(stream.twitch.tags)) : []),
+    ...(stream?.youtube.connected && stream.youtube.live ? validateYouTube(youtubeTitle, asStringArray(stream.youtube.tags)) : []),
+  ];
+  return `<section class="subtitle-panel" aria-labelledby="subtitle-title">
+    <div class="panel-heading"><h2 id="subtitle-title">${t("subtitle")}</h2><span class="template-store">Streamer.bot</span></div>
+    <div class="subtitle-grid">
+      <label class="subtitle-field">${t("subtitle")}<input data-input="main-subtitle" value="${escapeHtml(subtitle)}" placeholder="${escapeHtml(t("subtitleExample"))}" /></label>
+      <div class="template-preview"><span>Twitch</span><strong>${renderTemplateValue(settings.twitchTemplate, subtitle)}</strong>${titleCounter(twitchTitle, 140)}</div>
+      <div class="template-preview"><span>YouTube</span><strong>${renderTemplateValue(settings.youtubeTemplate, subtitle)}</strong>${titleCounter(youtubeTitle, 100)}</div>
+      <div class="subtitle-actions">${button(state.subtitleSaving ? t("saving") : t("apply"), "save-subtitle", { className: "button primary", disabled: errors.length > 0 || state.subtitleSaving })}</div>
+    </div>
+    ${errors.length ? `<p class="form-errors">${errors.map(escapeHtml).join("<br />")}</p>` : ""}
+  </section>`;
 }
 
 function templatePanel(): string {
   const draft = state.templateDraft;
+  const subtitle = settings.lastSubtitle;
   const valid = isTemplateValid(draft.twitchTemplate) && isTemplateValid(draft.youtubeTemplate);
-  const twitchTitle = titleFromTemplate(draft.twitchTemplate, draft.subtitle);
-  const youtubeTitle = titleFromTemplate(draft.youtubeTemplate, draft.subtitle);
-  return `<section class="template-panel" aria-labelledby="templates-title">
+  const twitchTitle = titleFromTemplate(draft.twitchTemplate, subtitle);
+  const youtubeTitle = titleFromTemplate(draft.youtubeTemplate, subtitle);
+  return `<section class="template-panel settings-template-panel" aria-labelledby="templates-title">
     <div class="panel-heading"><h2 id="templates-title">${t("templates")}</h2><span class="template-store">Streamer.bot</span></div>
     <div class="template-grid">
-      <label class="subtitle-field">${t("subtitle")}<input data-input="main-subtitle" value="${escapeHtml(draft.subtitle)}" placeholder="${escapeHtml(t("subtitleExample"))}" /></label>
-      ${syntaxEditor(t("twitchTemplate"), "main-twitch-template", draft.twitchTemplate)}
-      ${syntaxEditor(t("youtubeTemplate"), "main-youtube-template", draft.youtubeTemplate)}
+      ${syntaxEditor(t("twitchTemplate"), "settings-twitch-template", draft.twitchTemplate)}
+      ${syntaxEditor(t("youtubeTemplate"), "settings-youtube-template", draft.youtubeTemplate)}
     </div>
-    <div class="template-preview-grid"><div class="template-preview"><span>Twitch</span><strong>${renderTemplateValue(draft.twitchTemplate, draft.subtitle)}</strong>${titleCounter(twitchTitle, 140)}</div><div class="template-preview"><span>YouTube</span><strong>${renderTemplateValue(draft.youtubeTemplate, draft.subtitle)}</strong>${titleCounter(youtubeTitle, 100)}</div></div>
+    <div class="template-preview-grid"><div class="template-preview"><span>Twitch</span><strong>${renderTemplateValue(draft.twitchTemplate, subtitle)}</strong>${titleCounter(twitchTitle, 140)}</div><div class="template-preview"><span>YouTube</span><strong>${renderTemplateValue(draft.youtubeTemplate, subtitle)}</strong>${titleCounter(youtubeTitle, 100)}</div></div>
     ${valid ? "" : `<p class="form-errors">${t("templateValidation")}</p>`}
-    <div class="template-actions">${button(t("reset"), "reset-main-templates", { icon: uiIcon("refresh") })}${button(state.templatesSaving ? t("saving") : t("saveTemplates"), "save-templates", { className: "button primary", icon: uiIcon("braces"), disabled: !valid || state.templatesSaving })}</div>
+    <div class="template-actions">${button(t("reset"), "reset-templates", { icon: uiIcon("refresh") })}${button(state.templatesSaving ? t("saving") : t("saveTemplates"), "save-templates", { className: "button primary", icon: uiIcon("braces"), disabled: !valid || state.templatesSaving })}</div>
   </section>`;
 }
 
@@ -466,7 +491,7 @@ function settingsModal(): string {
   const draft = state.settingsDraft;
   return `<div class="modal-backdrop"><section class="modal settings-modal" role="dialog" aria-modal="true" aria-labelledby="settings-title">
     <div class="modal-header"><div><span class="eyebrow">${t("connection")}</span><h2 id="settings-title">${t("settings")}</h2></div>${iconButton("close-modal", t("close"), renderIcon("close"))}</div>
-    <div class="modal-body"><h3>${t("connectionToStreamerbot")}</h3><div class="settings-grid"><label>Host<input data-input="settings-host" value="${escapeHtml(draft.host)}" /></label><label>Port<input data-input="settings-port" type="number" min="1" max="65535" value="${escapeHtml(draft.port)}" /></label></div><label>Endpoint<input data-input="settings-endpoint" value="${escapeHtml(draft.endpoint)}" /></label><label>${t("password")}<input data-input="settings-password" type="password" value="${escapeHtml(draft.password)}" autocomplete="current-password" /></label><label class="check-row"><input data-input="settings-remember" type="checkbox"${draft.rememberPassword ? " checked" : ""} />${t("rememberPassword")}</label></div>
+    <div class="modal-body"><section class="settings-section"><h3>${t("connectionToStreamerbot")}</h3><div class="settings-grid"><label>Host<input data-input="settings-host" value="${escapeHtml(draft.host)}" /></label><label>Port<input data-input="settings-port" type="number" min="1" max="65535" value="${escapeHtml(draft.port)}" /></label></div><label>Endpoint<input data-input="settings-endpoint" value="${escapeHtml(draft.endpoint)}" /></label><label>${t("password")}<input data-input="settings-password" type="password" value="${escapeHtml(draft.password)}" autocomplete="current-password" /></label><label class="check-row"><input data-input="settings-remember" type="checkbox"${draft.rememberPassword ? " checked" : ""} />${t("rememberPassword")}</label></section>${templatePanel()}</div>
     <div class="modal-footer">${button(t("save"), "save-settings", { className: "button primary" })}</div>
   </section></div>`;
 }
@@ -542,7 +567,7 @@ function syncTemplates(templates: TemplateState): void {
   if (!templates.configured && hasLocalCustomTemplate) return;
   settings = { ...settings, twitchTemplate: templates.twitchTemplate, youtubeTemplate: templates.youtubeTemplate, lastSubtitle: templates.subtitle };
   saveSettings();
-  if (!state.templatesDirty) state.templateDraft = { twitchTemplate: templates.twitchTemplate, youtubeTemplate: templates.youtubeTemplate, subtitle: templates.subtitle };
+  if (!state.templatesDirty && !state.subtitleDirty) state.templateDraft = { twitchTemplate: templates.twitchTemplate, youtubeTemplate: templates.youtubeTemplate, subtitle: templates.subtitle };
 }
 
 function handleCodeEvent(payload: unknown): void {
@@ -667,7 +692,7 @@ async function saveTemplates(): Promise<void> {
   state.templatesSaving = true;
   render();
   try {
-    const response = await callAction("saveTemplates", { ...draft });
+    const response = await callAction("saveTemplates", { twitchTemplate: draft.twitchTemplate, youtubeTemplate: draft.youtubeTemplate, subtitle: settings.lastSubtitle });
     if (!response.ok || !response.data) throw new Error(response.error?.message ?? t("templateStateSaveFailed"));
     const templates = normalizeTemplates(response.data.templates);
     syncTemplates({ ...templates, configured: true });
@@ -681,17 +706,51 @@ async function saveTemplates(): Promise<void> {
   }
 }
 
-async function persistSubtitle(subtitle: string): Promise<void> {
+async function persistSubtitle(subtitle: string): Promise<boolean> {
   const value = subtitle.trim();
   settings = { ...settings, lastSubtitle: value };
   state.templateDraft.subtitle = value;
   saveSettings();
-  if (!client?.ready || !state.action) return;
+  if (!client?.ready || !state.action) {
+    state.subtitleDirty = false;
+    return true;
+  }
   try {
     const response = await callAction("saveTemplates", { twitchTemplate: settings.twitchTemplate, youtubeTemplate: settings.youtubeTemplate, subtitle: value });
     if (!response.ok) throw new Error(response.error?.message ?? t("subtitleStateSaveFailed"));
+    state.subtitleDirty = false;
+    return true;
   } catch (error) {
     notify(t("subtitleSaveFailed"), [error instanceof Error ? error.message : t("unknownError")]);
+    return false;
+  }
+}
+
+async function saveSubtitle(): Promise<void> {
+  const stream = state.stream;
+  if (!stream) return;
+  const subtitle = state.templateDraft.subtitle;
+  const twitchTitle = titleFromTemplate(settings.twitchTemplate, subtitle);
+  const youtubeTitle = titleFromTemplate(settings.youtubeTemplate, subtitle);
+  const errors = [
+    ...(stream.twitch.connected ? validateTwitch(twitchTitle, asStringArray(stream.twitch.tags)) : []),
+    ...(stream.youtube.connected && stream.youtube.live ? validateYouTube(youtubeTitle, asStringArray(stream.youtube.tags)) : []),
+  ];
+  if (errors.length) { render(); return; }
+
+  state.subtitleSaving = true;
+  render();
+  try {
+    if (!await persistSubtitle(subtitle)) return;
+    const updates: Promise<boolean>[] = [];
+    if (stream.twitch.connected && twitchTitle !== stream.twitch.title) updates.push(updatePlatform("twitch", { title: twitchTitle }));
+    const youtubeAvailable = Boolean(stream.youtube.connected && stream.youtube.live && stream.youtube.broadcastId);
+    if (youtubeAvailable && youtubeTitle !== stream.youtube.title) updates.push(updatePlatform("youtube", { title: youtubeTitle }));
+    if (!youtubeAvailable) notify(t("youtubeSkipped"), [t("youtubeNotStarted")]);
+    await Promise.all(updates);
+  } finally {
+    state.subtitleSaving = false;
+    render();
   }
 }
 
@@ -885,7 +944,7 @@ async function saveEdit(): Promise<void> {
   if (!tagsEqual(form.tags, asStringArray(current.tags))) payload.tags = form.tags;
   if (!Object.keys(payload).length) { notify(t("unchanged"), [t("unchangedDescription")]); return; }
   if (form.titleMode === "subtitle") {
-    await persistSubtitle(form.subtitle);
+    if (!await persistSubtitle(form.subtitle)) return;
   }
   const success = await updatePlatform(form.platform, payload);
   if (success) clearModal();
@@ -897,7 +956,7 @@ async function saveAll(): Promise<void> {
   if (!form || !stream) return;
   const errors = validateAll(form);
   if (errors.length) { render(); return; }
-  await persistSubtitle(form.subtitle);
+  if (!await persistSubtitle(form.subtitle)) return;
   const twitchPayload: Record<string, unknown> = {};
   const twitchTitle = titleFromTemplate(settings.twitchTemplate, form.subtitle);
   if (stream.twitch.connected) {
@@ -986,9 +1045,9 @@ function updateInput(target: HTMLInputElement | HTMLTextAreaElement): void {
     case "settings-endpoint": state.settingsDraft.endpoint = target.value.trim() || "/"; break;
     case "settings-password": state.settingsDraft.password = target.value; break;
     case "settings-remember": if (target instanceof HTMLInputElement) state.settingsDraft.rememberPassword = target.checked; break;
-    case "main-twitch-template": state.templateDraft.twitchTemplate = target.value; state.templatesDirty = true; break;
-    case "main-youtube-template": state.templateDraft.youtubeTemplate = target.value; state.templatesDirty = true; break;
-    case "main-subtitle": state.templateDraft.subtitle = target.value; state.templatesDirty = true; break;
+    case "settings-twitch-template": state.templateDraft.twitchTemplate = target.value; state.templatesDirty = true; break;
+    case "settings-youtube-template": state.templateDraft.youtubeTemplate = target.value; state.templatesDirty = true; break;
+    case "main-subtitle": state.templateDraft.subtitle = target.value; state.subtitleDirty = true; break;
     case "edit-subtitle": if (state.editForm) state.editForm.subtitle = target.value; break;
     case "edit-title": if (state.editForm) state.editForm.title = target.value; break;
     case "all-subtitle": if (state.allForm) state.allForm.subtitle = target.value; break;
@@ -1065,8 +1124,9 @@ app.addEventListener("click", (event) => {
     case "choose-category": chooseCategory(target.dataset.kind as Platform, target.dataset.scope ?? "", target.dataset.id ?? ""); break;
     case "save-edit": void saveEdit(); break;
     case "save-all": void saveAll(); break;
+    case "save-subtitle": void saveSubtitle(); break;
     case "save-templates": void saveTemplates(); break;
-    case "reset-main-templates": state.templateDraft = { twitchTemplate: DEFAULT_TWITCH_TEMPLATE, youtubeTemplate: DEFAULT_YOUTUBE_TEMPLATE, subtitle: state.templateDraft.subtitle }; state.templatesDirty = true; render(); break;
+    case "reset-templates": state.templateDraft = { twitchTemplate: DEFAULT_TWITCH_TEMPLATE, youtubeTemplate: DEFAULT_YOUTUBE_TEMPLATE, subtitle: state.templateDraft.subtitle }; state.templatesDirty = true; render(); break;
     case "run-preset": void runPreset(target.dataset.presetId ?? "", target.dataset.presetName ?? t("presetDefault")); break;
     case "save-settings": {
       settings = { ...state.settingsDraft, endpoint: state.settingsDraft.endpoint || "/", port: Math.max(1, Math.min(65535, Number(state.settingsDraft.port) || 8080)) };

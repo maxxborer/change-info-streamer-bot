@@ -94,17 +94,22 @@ describe("Stream Info HTML actions", () => {
     await flush();
     expect(mockStreamerbot.actionCalls.some((call) => call.id === "preset-pubg")).toBe(true);
 
-    setValue('[data-input="main-twitch-template"]', "🔴 %subtitle% | test");
-    click("save-templates");
+    expect(document.querySelector('[data-input="settings-twitch-template"]')).toBeNull();
+    setValue('[data-input="main-subtitle"]', "Тестовый подзаголовок");
+    click("save-subtitle");
+    await flush();
     await flush();
     expect(commands()).toContain("saveTemplates");
     expect(document.querySelector(".template-value, .template-token")).not.toBeNull();
-
-    setValue('[data-input="main-twitch-template"]', "Переопределённый %subtitle%");
-    click("reset-main-templates");
-    expect((document.querySelector('[data-input="main-twitch-template"]') as HTMLTextAreaElement).value).toContain("!tg");
+    expect(commands()).toContain("updateTwitch");
+    expect(commands()).toContain("updateYouTube");
 
     click("open-settings");
+    expect(document.querySelector('[data-input="settings-twitch-template"]')).not.toBeNull();
+    setValue('[data-input="settings-twitch-template"]', "Переопределённый %subtitle%");
+    click("reset-templates");
+    expect((document.querySelector('[data-input="settings-twitch-template"]') as HTMLTextAreaElement).value).toContain("!tg");
+
     setValue('[data-input="settings-host"]', "localhost");
     click("save-settings");
     await flush();
@@ -166,7 +171,8 @@ describe("Stream Info HTML actions", () => {
     mockStreamerbot.actions = [{ id: "api-action", name: "STREAM INFO | API", group: "STREAM INFO", enabled: true }];
     click("check-action");
     await flush();
-    setValue('[data-input="main-twitch-template"]', "Тест %subtitle%");
+    click("open-settings");
+    setValue('[data-input="settings-twitch-template"]', "Тест %subtitle%");
     click("save-templates");
     await flush();
     expect(document.querySelector(".notice")).not.toBeNull();
@@ -205,6 +211,6 @@ describe("Stream Info HTML actions", () => {
 
     expect(mockStreamerbot.connectCalls).toBe(0);
     expect(document.querySelector('[data-platform="twitch"]')?.textContent).toContain("Maseaaao");
-    expect(document.querySelector('[data-input="main-twitch-template"]')).not.toBeNull();
+    expect(document.querySelector('[data-input="main-subtitle"]')).not.toBeNull();
   });
 });

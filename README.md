@@ -46,7 +46,7 @@ For a safe visual tour with sample data, append `?demo=1` to any built HTML file
 
 ## Templates and presets
 
-Templates are the first workspace block. Each template may contain at most one `%subtitle%` token.
+Title templates are configured in **Settings**. The first workspace block is **Subtitle**: it saves the subtitle and applies the resulting titles to connected Twitch and an active YouTube broadcast. Each template may contain at most one `%subtitle%` token.
 
 To create a game preset, make an Action in the `STREAM INFO` group named `PRESET | Game name`. Set any of the following persistent global variables, then call `STREAM INFO | API` with `command = applyPreset`:
 
