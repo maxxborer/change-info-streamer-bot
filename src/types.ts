@@ -39,6 +39,14 @@ export interface StreamState {
   apiVersion: number;
   twitch: TwitchState;
   youtube: YouTubeState;
+  templates: TemplateState;
+}
+
+export interface TemplateState {
+  twitchTemplate: string;
+  youtubeTemplate: string;
+  subtitle: string;
+  configured: boolean;
 }
 
 export interface ActionResponse {

@@ -9,8 +9,17 @@ using Newtonsoft.Json.Linq;
 
 public class CPHInline
 {
-    private const int ApiVersion = 1;
+    private const int ApiVersion = 2;
     private const string ReplyEvent = "stream_info_api_response";
+    private const string DefaultTwitchTemplate = "🔴 %subtitle%| !tg !yt !tw !donate";
+    private const string DefaultYouTubeTemplate = "🔴 [PUBG] %subtitle%| !tg !yt !tw !donate";
+    private const string TwitchTemplateKey = "stream_info.template.twitch";
+    private const string YouTubeTemplateKey = "stream_info.template.youtube";
+    private const string SubtitleKey = "stream_info.template.subtitle";
+    private const string TwitchCategoryKey = "stream_info.preset.twitchCategoryId";
+    private const string YouTubeCategoryKey = "stream_info.preset.youtubeCategoryName";
+    private const string TwitchTagsKey = "stream_info.preset.twitchTagsJson";
+    private const string YouTubeTagsKey = "stream_info.preset.youtubeTagsJson";
 
     public bool Execute()
     {
@@ -25,7 +34,8 @@ public class CPHInline
 
             if (string.IsNullOrWhiteSpace(command))
                 throw new InvalidOperationException("Команда не указана.");
-            if (string.IsNullOrWhiteSpace(requestId))
+            bool shouldReply = !string.IsNullOrWhiteSpace(requestId);
+            if (!shouldReply && !string.Equals(command, "applyPreset", StringComparison.Ordinal))
                 throw new InvalidOperationException("requestId не указан.");
 
             JObject payload = string.IsNullOrWhiteSpace(payloadJson) ? new JObject() : JObject.Parse(payloadJson);
@@ -45,12 +55,21 @@ public class CPHInline
                 case "updateYouTube":
                     data = UpdateYouTube(payload);
                     break;
+                case "saveTemplates":
+                    data = SaveTemplates(payload);
+                    break;
+                case "applyPreset":
+                    data = ApplyPreset();
+                    break;
                 default:
                     throw new InvalidOperationException("Неизвестная команда: " + command);
             }
 
             bool ok = data["ok"] == null || data.Value<bool>("ok");
-            Reply(requestId, command, ok, data, ok ? null : "Не все поля удалось изменить.");
+            if (shouldReply)
+                Reply(requestId, command, ok, data, ok ? null : "Не все поля удалось изменить.");
+            else if (!ok)
+                CPH.LogError("[STREAM INFO | API] Пресет применён не полностью.");
         }
         catch (Exception ex)
         {
@@ -69,8 +88,127 @@ public class CPHInline
         {
             ["apiVersion"] = ApiVersion,
             ["twitch"] = GetTwitchState(),
-            ["youtube"] = GetYouTubeState()
+            ["youtube"] = GetYouTubeState(),
+            ["templates"] = GetTemplates()
         };
+    }
+
+    private JObject GetTemplates()
+    {
+        string twitchTemplate = CPH.GetGlobalVar<string>(TwitchTemplateKey, true);
+        string youtubeTemplate = CPH.GetGlobalVar<string>(YouTubeTemplateKey, true);
+        string subtitle = CPH.GetGlobalVar<string>(SubtitleKey, true);
+        bool configured = twitchTemplate != null || youtubeTemplate != null || subtitle != null;
+
+        return new JObject
+        {
+            ["twitchTemplate"] = string.IsNullOrWhiteSpace(twitchTemplate) ? DefaultTwitchTemplate : twitchTemplate,
+            ["youtubeTemplate"] = string.IsNullOrWhiteSpace(youtubeTemplate) ? DefaultYouTubeTemplate : youtubeTemplate,
+            ["subtitle"] = subtitle ?? "",
+            ["configured"] = configured
+        };
+    }
+
+    private JObject SaveTemplates(JObject payload)
+    {
+        string twitchTemplate = payload.Value<string>("twitchTemplate") ?? DefaultTwitchTemplate;
+        string youtubeTemplate = payload.Value<string>("youtubeTemplate") ?? DefaultYouTubeTemplate;
+        string subtitle = (payload.Value<string>("subtitle") ?? "").Trim();
+
+        Ensure(HasAtMostOneSubtitle(twitchTemplate) && HasAtMostOneSubtitle(youtubeTemplate), "В каждом шаблоне разрешён только один %subtitle%.");
+        CPH.SetGlobalVar(TwitchTemplateKey, twitchTemplate, true);
+        CPH.SetGlobalVar(YouTubeTemplateKey, youtubeTemplate, true);
+        CPH.SetGlobalVar(SubtitleKey, subtitle, true);
+
+        return new JObject { ["ok"] = true, ["templates"] = GetTemplates() };
+    }
+
+    private JObject ApplyPreset()
+    {
+        JObject templates = GetTemplates();
+        var platforms = new JObject();
+        bool allOk = true;
+
+        JObject twitchPayload = new JObject
+        {
+            ["title"] = TitleFromTemplate(templates.Value<string>("twitchTemplate"), templates.Value<string>("subtitle"))
+        };
+        string twitchCategory = CPH.GetGlobalVar<string>(TwitchCategoryKey, true);
+        if (!string.IsNullOrWhiteSpace(twitchCategory)) twitchPayload["categoryId"] = twitchCategory;
+        JArray twitchTags = GetPresetTags(TwitchTagsKey);
+        if (twitchTags != null) twitchPayload["tags"] = twitchTags;
+        AddPresetResult(platforms, "twitch", twitchPayload, UpdateTwitch, ref allOk);
+
+        JObject youtubePayload = new JObject
+        {
+            ["title"] = TitleFromTemplate(templates.Value<string>("youtubeTemplate"), templates.Value<string>("subtitle"))
+        };
+        string youtubeCategory = CPH.GetGlobalVar<string>(YouTubeCategoryKey, true);
+        if (!string.IsNullOrWhiteSpace(youtubeCategory)) youtubePayload["categoryName"] = youtubeCategory;
+        JArray youtubeTags = GetPresetTags(YouTubeTagsKey);
+        if (youtubeTags != null) youtubePayload["tags"] = youtubeTags;
+        try
+        {
+            var broadcast = CPH.YouTubeGetLatestMonitoredBroadcast();
+            bool youtubeLive = broadcast != null && string.Equals(broadcast.Status, "live", StringComparison.OrdinalIgnoreCase);
+            if (youtubeLive)
+                AddPresetResult(platforms, "youtube", youtubePayload, UpdateYouTube, ref allOk);
+            else
+                platforms["youtube"] = new JObject { ["ok"] = true, ["skipped"] = true };
+        }
+        catch (Exception ex)
+        {
+            platforms["youtube"] = new JObject { ["ok"] = false, ["error"] = ex.Message };
+            allOk = false;
+        }
+
+        return new JObject { ["ok"] = allOk, ["platforms"] = platforms };
+    }
+
+    private void AddPresetResult(JObject platforms, string platform, JObject payload, Func<JObject, JObject> update, ref bool allOk)
+    {
+        try
+        {
+            JObject result = update(payload);
+            platforms[platform] = result;
+            allOk &= result.Value<bool>("ok");
+        }
+        catch (Exception ex)
+        {
+            platforms[platform] = new JObject { ["ok"] = false, ["error"] = ex.Message };
+            allOk = false;
+        }
+    }
+
+    private JArray GetPresetTags(string key)
+    {
+        string serialized = CPH.GetGlobalVar<string>(key, true);
+        if (string.IsNullOrWhiteSpace(serialized)) return null;
+        JToken parsed = JToken.Parse(serialized);
+        var tags = parsed as JArray;
+        Ensure(tags != null, key + " должен содержать JSON-массив тегов.");
+        return tags;
+    }
+
+    private static bool HasAtMostOneSubtitle(string template)
+    {
+        int first = (template ?? "").IndexOf("%subtitle%", StringComparison.Ordinal);
+        return first < 0 || (template ?? "").IndexOf("%subtitle%", first + "%subtitle%".Length, StringComparison.Ordinal) < 0;
+    }
+
+    private static string TitleFromTemplate(string template, string subtitle)
+    {
+        string source = template ?? "";
+        string value = (subtitle ?? "").Trim();
+        if (value.Length > 0) return source.Replace("%subtitle%", value).Trim();
+
+        int marker = source.IndexOf("%subtitle%", StringComparison.Ordinal);
+        if (marker < 0) return source.Trim();
+        string before = source.Substring(0, marker);
+        string after = source.Substring(marker + "%subtitle%".Length);
+        if (before.Length > 0 && after.Length > 0 && char.IsWhiteSpace(before[before.Length - 1]) && char.IsWhiteSpace(after[0]))
+            return (before.Substring(0, before.Length - 1) + after).Trim();
+        return (before + after).Trim();
     }
 
     private JObject GetTwitchState()
