@@ -22,6 +22,14 @@
 | External JS/CSS inspection | pass | Built HTML contains no external script or stylesheet dependency. |
 | Updated API v2 production import | pending owner acceptance | The generated package is structurally verified; it still needs the user's one-time Import click in the real Streamer.bot instance. |
 
+### SVG icon rendering repair
+
+- **Status:** complete
+- Reported reproduction: bundled Lucide icons were visibly cropped or degraded in the OBS dock.
+- Root cause: the icon decorator replaced the entire opening `<svg>` tag and discarded each OSS asset's `viewBox` (as well as its other rendering attributes).
+- Fix: retain the source SVG attributes and replace only accessibility/class metadata. CSS remains responsible for the displayed size and icon colour.
+- Added a regression test that asserts both UI and brand SVGs retain their original `viewBox`.
+
 ## 2026-08-18
 
 ### Import compatibility repair

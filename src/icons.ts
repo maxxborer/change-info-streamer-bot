@@ -56,7 +56,12 @@ export type UiIcon = keyof typeof uiSources;
 export type BrandIcon = keyof typeof brandSources;
 
 function decorate(source: string, className: string): string {
-  return source.replace(/<svg\b[^>]*>/, `<svg class="${className}" aria-hidden="true" focusable="false">`).replace(/<title>.*?<\/title>/, "");
+  return source
+    .replace(/<svg\b([^>]*)>/, (_tag, attributes: string) => {
+      const preservedAttributes = attributes.replace(/\s(?:class|role|aria-[\w-]+|focusable)=(?:"[^"]*"|'[^']*')/gi, "");
+      return `<svg${preservedAttributes} class="${className}" aria-hidden="true" focusable="false">`;
+    })
+    .replace(/<title>.*?<\/title>/, "");
 }
 
 export function uiIcon(name: UiIcon): string {

@@ -23,6 +23,7 @@
 - Streamer.bot 1.0.7 rejects an import whose metadata declares `minimumVersion: "1.0.7"`, despite reporting its own version as 1.0.7. The generated Import now declares 1.0.6 as its compatibility floor and keeps `exportedFrom: "1.0.7"`; a build-time decoder guards that invariant.
 - `CPH.GetGlobalVar` and `CPH.SetGlobalVar` provide persistent Streamer.bot storage suitable for template and preset values. The Action API now uses them behind `getState`, `saveTemplates`, and `applyPreset`; HTML never receives Twitch credentials.
 - UI behavior is covered by Vitest and JSDOM with a mocked `@streamerbot/client`. These tests exercise all HTML commands without a connection to Streamer.bot or a mutation of Twitch/YouTube data.
+- OSS SVG assets require their source `viewBox` to remain on the root `<svg>` element. Replacing that element while adding CSS classes crops Lucide artwork; the decorator now preserves source rendering attributes and changes only class/accessibility metadata.
 
 ## Resources
 
