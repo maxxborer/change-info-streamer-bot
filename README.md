@@ -1,57 +1,85 @@
-# Stream Info для Streamer.bot
+# Stream Info for Streamer.bot
 
-Готовый файл: `change-info-streamer-bot.html`.
+[Русская версия](README.ru.md)
 
-## Использование
+One self-contained HTML control surface for updating Twitch and YouTube stream metadata from an OBS dock. It connects only to Streamer.bot’s local WebSocket; there is no hosted service, OAuth page, or external UI dependency.
 
-1. Запустите Streamer.bot и убедитесь, что его встроенный WebSocket-сервер включён.
-2. Откройте `change-info-streamer-bot.html` двойным кликом.
-3. Если появится предложение импорта, скопируйте строку из HTML (или из `streamerbot-import.txt`) и вставьте её в **Import** Streamer.bot.
-4. Нажмите «Проверить снова» и пользуйтесь карточками Twitch и YouTube.
+![Russian dashboard showcase](docs/screenshots/dashboard-ru.png)
 
-Если раньше появлялось окно *Minimum Version Required* в Streamer.bot 1.0.7, используйте обновлённую Import-строку из текущей версии HTML: её порог совместимости исправлен для 1.0.7. Action API имеет версию 3, поэтому импортируйте строку ещё раз — HTML сам покажет требование, если на стороне Streamer.bot осталась старая версия.
+## What it does
 
-Никакой веб-сервер, `npm`, `pnpm dev`, OAuth-экран или отдельная программа для обычного использования не нужны. Файл подключается к `ws://127.0.0.1:8080/` автоматически. Если в Streamer.bot включена WebSocket-аутентификация, пароль вводится в компактном блоке под шапкой или в настройках.
+- Updates titles, categories, and tags on Twitch and on an active YouTube broadcast.
+- Keeps reusable Twitch and YouTube title templates in Streamer.bot global variables.
+- Discovers `PRESET | …` Actions in the `STREAM INFO` group for game presets.
+- Opens the correct YouTube Studio destination for both live and non-live states.
+- Ships as a single file that can be opened directly with `file://`.
+- Builds fully localized HTML in Russian, English, Spanish, and Simplified Chinese.
 
-В HTML уже встроены JavaScript, CSS, логотипы, иконки, список YouTube-категорий, библиотека Streamer.bot Client и настоящая Import-строка. Twitch OAuth-токен и Client ID используются только внутри C# Action в Streamer.bot и не попадают в HTML.
+## Quick start
 
-Кнопка YouTube Studio открывает страницу активного эфира. Во всех не-live состояниях она открывает раздел прямых трансляций подключённого YouTube-канала, а не устаревшую запись завершённого broadcast.
+1. Download and open [change-info-streamer-bot.html](change-info-streamer-bot.html).
+2. Make sure Streamer.bot’s built-in WebSocket server is enabled.
+3. If prompted, copy [streamerbot-import.txt](streamerbot-import.txt), select **Import** in Streamer.bot, and complete the import.
+4. Return to Stream Info and select **Check again**.
 
-## Шаблоны и игровые пресеты
+The page automatically connects to `ws://127.0.0.1:8080/`. If your WebSocket requires a password, enter it in the compact connection panel or in Settings. Twitch credentials remain inside the Streamer.bot Action and are never embedded in the HTML file.
 
-Редактор шаблонов находится на главном экране. «Сохранить шаблоны» сохраняет два шаблона и последний подзаголовок не только в браузере, но и в постоянных глобальных переменных Streamer.bot. Поэтому ими можно управлять из ваших существующих Actions.
+## Languages and builds
 
-Для игрового пресета создайте свой Action в группе `STREAM INFO`, дайте ему имя вида `PRESET | PUBG` и выполните в нём три шага:
-
-1. Сохраните нужные значения в глобальные переменные ниже.
-2. Вызовите `STREAM INFO | API` с аргументом `command = applyPreset`.
-3. Вернитесь в HTML и обновите данные: этот Action появится кнопкой в блоке «Игровые пресеты».
-
-| Переменная | Значение |
-| --- | --- |
-| `stream_info.template.twitch` | шаблон Twitch с единственным `%subtitle%` |
-| `stream_info.template.youtube` | шаблон YouTube с единственным `%subtitle%` |
-| `stream_info.template.subtitle` | подзаголовок |
-| `stream_info.preset.twitchCategoryId` | Twitch category ID, например `493057` |
-| `stream_info.preset.youtubeCategoryName` | название категории YouTube |
-| `stream_info.preset.twitchTagsJson` | JSON-массив Twitch-тегов, например `["Русский","PUBG"]` |
-| `stream_info.preset.youtubeTagsJson` | JSON-массив YouTube-тегов |
-
-Пустая переменная означает «не менять это поле». `applyPreset` применяет Twitch и активный YouTube-эфир по отдельности; если YouTube не запущен, Twitch обновится, а YouTube будет отмечен как пропущенный. Пара методов для чтения и записи таких постоянных переменных есть в [документации Streamer.bot](https://docs.streamer.bot/api/csharp/methods/core/globals/get-global-var).
-
-## Разработка и сборка
-
-Требуется Node.js. Одна команда создаёт все пользовательские артефакты:
+The checked-in `change-info-streamer-bot.html` is the Russian default for direct use. Run the build to create all standalone variants:
 
 ```powershell
 npm install
 npm run build
 ```
 
-Результаты сборки:
+| Language | Generated file |
+| --- | --- |
+| Russian | `dist/change-info-streamer-bot.ru.html` |
+| English | `dist/change-info-streamer-bot.en.html` |
+| Spanish | `dist/change-info-streamer-bot.es.html` |
+| Simplified Chinese | `dist/change-info-streamer-bot.zh.html` |
 
-- `dist/change-info-streamer-bot.html`
-- `change-info-streamer-bot.html`
-- `streamerbot-import.txt`
+For a safe visual tour with sample data, append `?demo=1` to any built HTML file. Demo mode does not connect to Streamer.bot or make platform changes.
 
-Исходный C# Action находится в `streamerbot/action.cs`; Import-строка пересобирается из него автоматически. Перед сдачей выполнены строгая проверка TypeScript, UI-тесты с полностью подменённым WebSocket-клиентом, single-file build, проверка отсутствия внешних JS/CSS-ресурсов и проверка Import-пакета. Проверки реального эфира и изменения Twitch/YouTube намеренно не выполнялись: для них нужны подключённые аккаунты владельца.
+![English full-screen editor showcase](docs/screenshots/modal-en.png)
+
+## Templates and presets
+
+Templates are the first workspace block. Each template may contain at most one `%subtitle%` token.
+
+To create a game preset, make an Action in the `STREAM INFO` group named `PRESET | Game name`. Set any of the following persistent global variables, then call `STREAM INFO | API` with `command = applyPreset`:
+
+| Variable | Meaning |
+| --- | --- |
+| `stream_info.template.twitch` | Twitch title template |
+| `stream_info.template.youtube` | YouTube title template |
+| `stream_info.template.subtitle` | Subtitle |
+| `stream_info.preset.twitchCategoryId` | Twitch category ID |
+| `stream_info.preset.youtubeCategoryName` | YouTube category name |
+| `stream_info.preset.twitchTagsJson` | Twitch tag JSON array |
+| `stream_info.preset.youtubeTagsJson` | YouTube tag JSON array |
+
+An empty variable leaves that field unchanged. YouTube is skipped when no broadcast is running, while Twitch can still be updated.
+
+## Development
+
+```powershell
+npm install
+npm test
+npm run build
+```
+
+`npm run build` regenerates the native Streamer.bot import, checks TypeScript, and emits all four single-file HTML variants. `dist/` is a local build directory and is intentionally not committed.
+
+## Security and support
+
+Please read [SECURITY.md](SECURITY.md) before reporting a vulnerability. For contribution expectations, see [CONTRIBUTING.md](CONTRIBUTING.md) and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
+
+## Credits
+
+Thank you to [nutty.gg](https://nutty.gg/) for the idea and inspiration behind the focused streamer control-surface direction.
+
+## License
+
+[MIT](LICENSE) © 2026 maxxborer

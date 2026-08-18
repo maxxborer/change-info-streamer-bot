@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 const project = resolve(import.meta.dirname, "..");
-const encoded = readFileSync(resolve(project, "streamerbot/import.txt"), "utf8").trim();
+const encoded = readFileSync(resolve(project, "streamerbot-import.txt"), "utf8").trim();
 const bytes = Buffer.from(encoded, "base64");
 
 if (bytes.subarray(0, 4).toString("ascii") !== "SBAE") {

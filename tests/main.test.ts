@@ -46,6 +46,7 @@ describe("Stream Info HTML actions", () => {
     vi.resetModules();
     mockStreamerbot.reset();
     localStorage.clear();
+    window.history.replaceState({}, "", "/");
     document.body.innerHTML = '<div id="app"></div>';
     vi.stubGlobal("open", open);
     Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
@@ -196,5 +197,14 @@ describe("Stream Info HTML actions", () => {
     expect(links[3]?.disabled).toBe(false);
     links[3]?.click();
     expect(open).toHaveBeenCalledWith("https://studio.youtube.com/channel/UC-test-channel/livestreaming/dashboard", "_blank", "noopener,noreferrer");
+  });
+
+  it("renders showcase data without opening a Streamer.bot connection in demo mode", async () => {
+    window.history.replaceState({}, "", "/?demo=1");
+    await boot();
+
+    expect(mockStreamerbot.connectCalls).toBe(0);
+    expect(document.querySelector('[data-platform="twitch"]')?.textContent).toContain("Maseaaao");
+    expect(document.querySelector('[data-input="main-twitch-template"]')).not.toBeNull();
   });
 });

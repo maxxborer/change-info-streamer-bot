@@ -8,7 +8,7 @@
     "generate-import": "node scripts/generate-import.mjs && node scripts/verify-import.mjs",
     "check": "tsc --noEmit",
     "test": "vitest run",
-    "build": "npm run generate-import && npm run check && vite build && node scripts/copy-release.mjs",
+    "build": "npm run generate-import && npm run check && node scripts/build-locales.mjs && node scripts/verify-locales.mjs",
     "preview": "vite preview"
   },
   "dependencies": {

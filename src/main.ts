@@ -1,8 +1,9 @@
 import { StreamerbotClient } from "@streamerbot/client";
 import { brandIcon, uiIcon } from "./icons";
 import { FALLBACK_CATEGORY_SVG, YOUTUBE_CATEGORIES } from "./youtube-categories";
-import { STREAMERBOT_IMPORT } from "./streamerbot-import";
+import STREAMERBOT_IMPORT from "../streamerbot-import.txt?raw";
 import { DEFAULT_TWITCH_TEMPLATE, DEFAULT_YOUTUBE_TEMPLATE, isTemplateValid, titleFromTemplate } from "./templates";
+import { locale, localeTag, t } from "./i18n";
 import type {
   ActionResponse,
   ActionSummary,
@@ -25,6 +26,7 @@ const ACTION_NAME = "STREAM INFO | API";
 const CODE_EVENT = "stream_info_api_response";
 const STORAGE_KEY = "change-info-streamer-bot.settings.v1";
 const REQUEST_TIMEOUT = 15_000;
+const DEMO_MODE = new URLSearchParams(window.location.search).has("demo");
 
 type ConnectionStatus = "connecting" | "connected" | "disconnected";
 type ActionStatus = "unknown" | "ready" | "missing" | "disabled" | "outdated";
@@ -131,9 +133,57 @@ const state: AppState = {
   lastUpdated: null,
 };
 
+function enableDemoMode(): void {
+  const stream: StreamState = {
+    apiVersion: API_VERSION,
+    twitch: {
+      connected: true,
+      live: true,
+      accountName: "Maseaaao",
+      login: "maseaaao",
+      title: "Ranked grind — road to Diamond",
+      categoryId: "493057",
+      categoryName: "PUBG: BATTLEGROUNDS",
+      categoryImageUrl: "",
+      tags: ["PUBG", "Ranked", "RU"],
+    },
+    youtube: {
+      connected: true,
+      live: true,
+      accountName: "Maseaaao Live",
+      channelId: "UC-demo-channel",
+      broadcastId: "demo-live",
+      status: "live",
+      title: "PUBG Ranked — live with chat",
+      categoryId: "20",
+      categoryName: "Видеоигры",
+      tags: ["PUBG", "Live", "Gaming"],
+    },
+    templates: {
+      twitchTemplate: "🔴 %subtitle% | !tg !yt !tw !donate",
+      youtubeTemplate: "🔴 [PUBG] %subtitle% | !tg !yt !tw !donate",
+      subtitle: "Ranked with chat",
+      configured: true,
+    },
+  };
+  state.connection = "connected";
+  state.actionStatus = "ready";
+  state.action = { id: "demo-action", name: ACTION_NAME, group: ACTION_GROUP, enabled: true };
+  state.stream = stream;
+  state.templateDraft = { twitchTemplate: stream.templates.twitchTemplate, youtubeTemplate: stream.templates.youtubeTemplate, subtitle: stream.templates.subtitle };
+  state.presetActions = [
+    { id: "demo-pubg", name: "PRESET | PUBG", group: ACTION_GROUP, enabled: true, label: "PUBG" },
+    { id: "demo-just-chatting", name: "PRESET | Just Chatting", group: ACTION_GROUP, enabled: true, label: "Just Chatting" },
+  ];
+  state.lastUpdated = new Date();
+}
+
 const appElement = document.querySelector<HTMLDivElement>("#app");
-if (!appElement) throw new Error("Не найден контейнер приложения.");
+if (!appElement) throw new Error(t("containerNotFound"));
 const app: HTMLDivElement = appElement;
+
+document.documentElement.lang = locale;
+document.title = "Stream Info";
 
 let client: StreamerbotClient | null = null;
 let requestResolvers = new Map<string, { resolve: (response: ActionResponse) => void; reject: (reason: Error) => void; timer: number }>();
@@ -176,9 +226,9 @@ function closeNotice(id: string): void {
 }
 
 function connectionText(): string {
-  if (state.connection === "connected") return "Streamer.bot подключён";
-  if (state.connection === "connecting") return "Подключение…";
-  return "Streamer.bot не подключён";
+  if (state.connection === "connected") return t("connectionConnected");
+  if (state.connection === "connecting") return t("connectionConnecting");
+  return t("connectionDisconnected");
 }
 
 function cardStatus(platform: Platform): "live" | "offline" | "disconnected" {
@@ -208,36 +258,36 @@ function renderHeader(): string {
     <div class="brand"><span class="brand-mark">S</span><h1>Stream Info</h1></div>
     <div class="header-actions">
       <span class="connection connection-${state.connection}"><i></i>${escapeHtml(connectionText())}</span>
-      ${iconButton("refresh-state", "Обновить данные", renderIcon("refresh"), state.connection !== "connected")}
-      ${iconButton("open-settings", "Настройки", renderIcon("settings"))}
-      ${button("Обновить все", "open-all", { className: "button primary", disabled: !state.stream || state.connection !== "connected" })}
+      ${iconButton("refresh-state", t("refresh"), renderIcon("refresh"), state.connection !== "connected")}
+      ${iconButton("open-settings", t("settings"), renderIcon("settings"))}
+      ${button(t("updateAll"), "open-all", { className: "button primary", disabled: !state.stream || state.connection !== "connected" })}
     </div>
   </header>`;
 }
 
 function authPanel(): string {
   if (!state.authNeeded) return "";
-  return `<section class="auth-panel" aria-label="Авторизация Streamer.bot">
-    <div>${renderIcon("warning")}<div><strong>Не удалось авторизоваться в Streamer.bot</strong><span>${escapeHtml(state.connectionError ?? "Укажите пароль WebSocket и подключитесь снова.")}</span></div></div>
-    <label>Пароль <input type="password" name="auth-password" data-input="auth-password" value="${escapeHtml(settings.password)}" autocomplete="current-password" /></label>
-    ${button("Подключиться", "connect-password", { className: "button primary" })}
+  return `<section class="auth-panel" aria-label="${escapeHtml(t("authLabel"))}">
+    <div>${renderIcon("warning")}<div><strong>${t("authFailed")}</strong><span>${escapeHtml(state.connectionError ?? t("authHint"))}</span></div></div>
+    <label>${t("password")} <input type="password" name="auth-password" data-input="auth-password" value="${escapeHtml(settings.password)}" autocomplete="current-password" /></label>
+    ${button(t("connect"), "connect-password", { className: "button primary" })}
   </section>`;
 }
 
 function renderImport(): string {
   const outdated = state.actionStatus === "outdated";
   const disabled = state.actionStatus === "disabled";
-  const headline = outdated ? "Версия Action устарела. Повторно импортируйте актуальную строку." : disabled ? `Action «${ACTION_NAME}» отключён в Streamer.bot.` : `Для работы требуется Action «${ACTION_NAME}».`;
-  const body = disabled ? "Включите его в Streamer.bot и нажмите «Проверить снова»." : `<ol><li>Откройте Streamer.bot.</li><li>Нажмите Import.</li><li>Вставьте строку ниже.</li><li>Завершите импорт.</li></ol>`;
+  const headline = outdated ? t("importOutdated") : disabled ? t("importDisabled", { action: ACTION_NAME }) : t("importRequired", { action: ACTION_NAME });
+  const body = disabled ? t("importEnable") : t("importSteps");
   return `<main class="setup-wrap"><section class="setup-card">
     <div class="setup-icon">${renderIcon(disabled ? "warning" : "copy")}</div>
     <h2>${escapeHtml(headline)}</h2>${body}
     <div class="setup-actions">
-      ${button(state.importCopied ? "Скопировано" : "Скопировать Import-строку", "copy-import", { className: "button primary", icon: renderIcon("copy") })}
-      ${button(state.showImport ? "Скрыть строку" : "Показать строку", "toggle-import")}
-      ${button("Проверить снова", "check-action")}
+      ${button(state.importCopied ? t("copied") : t("copyImport"), "copy-import", { className: "button primary", icon: renderIcon("copy") })}
+      ${button(state.showImport ? t("hideImport") : t("showImport"), "toggle-import")}
+      ${button(t("checkAgain"), "check-action")}
     </div>
-    ${state.showImport ? `<textarea class="import-code" readonly aria-label="Import-строка Streamer.bot">${escapeHtml(STREAMERBOT_IMPORT)}</textarea>` : ""}
+    ${state.showImport ? `<textarea class="import-code" readonly aria-label="${escapeHtml(t("importAria"))}">${escapeHtml(STREAMERBOT_IMPORT)}</textarea>` : ""}
   </section></main>`;
 }
 
@@ -246,7 +296,7 @@ function platformLogo(platform: Platform): string {
 }
 
 function tagsHtml(tags: string[]): string {
-  return tags.length ? `<div class="tag-list">${tags.map((tag) => `<span class="tag">${escapeHtml(tag)}</span>`).join("")}</div>` : '<span class="muted">Нет тегов</span>';
+  return tags.length ? `<div class="tag-list">${tags.map((tag) => `<span class="tag">${escapeHtml(tag)}</span>`).join("")}</div>` : `<span class="muted">${t("noTags")}</span>`;
 }
 
 function categoryImage(imageUrl: string | undefined): string {
@@ -260,7 +310,7 @@ function youtubeCategoryIcon(categoryId: string | undefined): string {
 }
 
 function categorySummary(visual: string, name: string | null | undefined, id: string | null | undefined): string {
-  return `<div class="category-summary">${visual}<div><span>Категория</span><strong>${escapeHtml(name || "—")}</strong><small>ID ${escapeHtml(id || "—")}</small></div></div>`;
+  return `<div class="category-summary">${visual}<div><span>${t("category")}</span><strong>${escapeHtml(name || "—")}</strong><small>ID ${escapeHtml(id || "—")}</small></div></div>`;
 }
 
 function renderTwitchCard(twitch: TwitchState): string {
@@ -270,10 +320,10 @@ function renderTwitchCard(twitch: TwitchState): string {
   const streamUrl = login ? `https://www.twitch.tv/${encodeURIComponent(login)}` : "";
   const dashboardUrl = login ? `https://dashboard.twitch.tv/u/${encodeURIComponent(login)}/stream-manager` : "";
   return `<section class="platform-card ${status}${state.cardErrors.twitch ? " card-error" : ""}${state.cardEffects.twitch ? ` card-${state.cardEffects.twitch}` : ""}" data-platform="twitch">
-    <div class="card-heading"><div>${platformLogo("twitch")}<div><h2>Twitch</h2><span>${escapeHtml(twitch.accountName || "Аккаунт не подключён")}</span></div></div><span class="live-badge ${status}">${status === "live" ? "В эфире" : status === "offline" ? "Не в эфире" : "Не подключён"}</span></div>
-    ${loading ? '<div class="card-spinner" aria-label="Выполняется обновление"></div>' : ""}
-    <div class="card-body"><div class="stream-title"><span>Название</span><strong>${escapeHtml(twitch.title || "—")}</strong></div><div class="stream-meta">${categorySummary(categoryImage(twitch.categoryImageUrl), twitch.categoryName, twitch.categoryId)}<div class="tags-section"><span>Теги</span>${tagsHtml(asStringArray(twitch.tags))}</div></div></div>
-    <div class="card-footer"><div>${button("Изменить", "edit-twitch", { disabled: !twitch.connected || loading })}</div><div class="card-links">${iconButton("open-link", "Открыть стрим", renderIcon("external"), !streamUrl, ` data-url="${escapeHtml(streamUrl)}"`)}${iconButton("open-link", "Открыть дашборд", renderIcon("dashboard"), !dashboardUrl, ` data-url="${escapeHtml(dashboardUrl)}"`)}</div></div>
+    <div class="card-heading"><div>${platformLogo("twitch")}<div><h2>Twitch</h2><span>${escapeHtml(twitch.accountName || t("accountNotConnected"))}</span></div></div><span class="live-badge ${status}">${status === "live" ? t("live") : status === "offline" ? t("offline") : t("notConnected")}</span></div>
+    ${loading ? `<div class="card-spinner" aria-label="${escapeHtml(t("updating"))}"></div>` : ""}
+    <div class="card-body"><div class="stream-title"><span>${t("title")}</span><strong>${escapeHtml(twitch.title || "—")}</strong></div><div class="stream-meta">${categorySummary(categoryImage(twitch.categoryImageUrl), twitch.categoryName, twitch.categoryId)}<div class="tags-section"><span>${t("tags")}</span>${tagsHtml(asStringArray(twitch.tags))}</div></div></div>
+    <div class="card-footer"><div>${button(t("edit"), "edit-twitch", { disabled: !twitch.connected || loading })}</div><div class="card-links">${iconButton("open-link", t("openStream"), renderIcon("external"), !streamUrl, ` data-url="${escapeHtml(streamUrl)}"`)}${iconButton("open-link", t("openDashboard"), renderIcon("dashboard"), !dashboardUrl, ` data-url="${escapeHtml(dashboardUrl)}"`)}</div></div>
   </section>`;
 }
 
@@ -288,21 +338,21 @@ function renderYouTubeCard(youtube: YouTubeState): string {
     : youtube.channelId
       ? `https://studio.youtube.com/channel/${encodeURIComponent(youtube.channelId)}/livestreaming/dashboard`
       : youtube.connected ? "https://studio.youtube.com/" : "";
-  const details = canEdit ? `<div class="card-body"><div class="stream-title"><span>Название</span><strong>${escapeHtml(youtube.title || "—")}</strong></div><div class="stream-meta">${categorySummary(youtubeCategoryIcon(youtube.categoryId), youtube.categoryName, youtube.categoryId)}<div class="tags-section"><span>Теги</span>${tagsHtml(asStringArray(youtube.tags))}</div></div></div>` : "";
+  const details = canEdit ? `<div class="card-body"><div class="stream-title"><span>${t("title")}</span><strong>${escapeHtml(youtube.title || "—")}</strong></div><div class="stream-meta">${categorySummary(youtubeCategoryIcon(youtube.categoryId), youtube.categoryName, youtube.categoryId)}<div class="tags-section"><span>${t("tags")}</span>${tagsHtml(asStringArray(youtube.tags))}</div></div></div>` : "";
   return `<section class="platform-card ${status}${!canEdit ? " compact-unavailable" : ""}${state.cardErrors.youtube ? " card-error" : ""}${state.cardEffects.youtube ? ` card-${state.cardEffects.youtube}` : ""}" data-platform="youtube">
-    <div class="card-heading"><div>${platformLogo("youtube")}<div><h2>YouTube</h2><span>${escapeHtml(youtube.accountName || "Аккаунт не подключён")}</span></div></div><span class="live-badge ${status}">${youtube.live ? "В эфире" : "Не запущен"}</span></div>
-    ${!canEdit ? '<div class="youtube-warning">Стрим YouTube должен быть запущен</div>' : ""}
-    ${loading ? '<div class="card-spinner" aria-label="Выполняется обновление"></div>' : ""}
+    <div class="card-heading"><div>${platformLogo("youtube")}<div><h2>YouTube</h2><span>${escapeHtml(youtube.accountName || t("accountNotConnected"))}</span></div></div><span class="live-badge ${status}">${youtube.live ? t("live") : t("notStarted")}</span></div>
+    ${!canEdit ? `<div class="youtube-warning">${t("youtubeNotStarted")}</div>` : ""}
+    ${loading ? `<div class="card-spinner" aria-label="${escapeHtml(t("updating"))}"></div>` : ""}
     ${details}
-    <div class="card-footer"><div>${button("Изменить", "edit-youtube", { disabled: !canEdit || loading })}</div><div class="card-links">${iconButton("open-link", "Открыть стрим", renderIcon("external"), !streamUrl, ` data-url="${escapeHtml(streamUrl)}"`)}${iconButton("open-link", "Открыть дашборд", renderIcon("dashboard"), !dashboardUrl, ` data-url="${escapeHtml(dashboardUrl)}"`)}</div></div>
+    <div class="card-footer"><div>${button(t("edit"), "edit-youtube", { disabled: !canEdit || loading })}</div><div class="card-links">${iconButton("open-link", t("openStream"), renderIcon("external"), !streamUrl, ` data-url="${escapeHtml(streamUrl)}"`)}${iconButton("open-link", t("openDashboard"), renderIcon("dashboard"), !dashboardUrl, ` data-url="${escapeHtml(dashboardUrl)}"`)}</div></div>
   </section>`;
 }
 
 function renderMain(): string {
   const stream = state.stream;
-  if (!stream) return `<main class="empty-state"><div class="loader"></div><p>Получаем данные Streamer.bot…</p></main>`;
-  const stamp = state.lastUpdated ? state.lastUpdated.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit", second: "2-digit" }) : "—";
-  return `<main class="content"><div class="cards">${renderTwitchCard(stream.twitch)}${renderYouTubeCard(stream.youtube)}</div><div class="bottom-panels">${templatePanel()}${presetPanel()}</div><p class="updated-at">Обновлено: ${escapeHtml(stamp)}</p></main>`;
+  if (!stream) return `<main class="empty-state"><div class="loader"></div><p>${t("loading")}</p></main>`;
+  const stamp = state.lastUpdated ? state.lastUpdated.toLocaleTimeString(localeTag[locale], { hour: "2-digit", minute: "2-digit", second: "2-digit" }) : "—";
+  return `<main class="content"><div class="templates-top">${templatePanel()}</div><div class="cards">${renderTwitchCard(stream.twitch)}${renderYouTubeCard(stream.youtube)}</div><div class="presets-below">${presetPanel()}</div><p class="updated-at">${t("updated")} ${escapeHtml(stamp)}</p></main>`;
 }
 
 function renderCategoryOption(category: TwitchCategory | YouTubeCategory, kind: Platform, scope: string): string {
@@ -311,15 +361,15 @@ function renderCategoryOption(category: TwitchCategory | YouTubeCategory, kind: 
 }
 
 function renderTagInput(tags: string[], draft: string, scope: string, disabled: boolean): string {
-  return `<div class="chip-input ${disabled ? "disabled" : ""}">${tags.map((tag, index) => `<span class="chip">${escapeHtml(tag)}<button type="button" data-action="remove-tag" data-scope="${scope}" data-index="${index}" aria-label="Удалить тег ${escapeHtml(tag)}">×</button></span>`).join("")}<input data-input="tag-draft" data-scope="${scope}" value="${escapeHtml(draft)}" placeholder="Добавить тег"${disabled ? " disabled" : ""} /></div>`;
+  return `<div class="chip-input ${disabled ? "disabled" : ""}">${tags.map((tag, index) => `<span class="chip">${escapeHtml(tag)}<button type="button" data-action="remove-tag" data-scope="${scope}" data-index="${index}" aria-label="${escapeHtml(t("removeTag", { tag }))}">×</button></span>`).join("")}<input data-input="tag-draft" data-scope="${scope}" value="${escapeHtml(draft)}" placeholder="${escapeHtml(t("addTag"))}"${disabled ? " disabled" : ""} /></div>`;
 }
 
 function categoryControl(platform: Platform, selected: TwitchCategory | YouTubeCategory | null, query: string, scope: string, disabled: boolean): string {
-  const results = platform === "twitch" ? state.twitchResults : YOUTUBE_CATEGORIES.filter((item) => `${item.name} ${item.id}`.toLocaleLowerCase("ru-RU").includes(query.toLocaleLowerCase("ru-RU"))).slice(0, 20);
+  const results = platform === "twitch" ? state.twitchResults : YOUTUBE_CATEGORIES.filter((item) => `${item.name} ${item.id}`.toLocaleLowerCase(localeTag[locale]).includes(query.toLocaleLowerCase(localeTag[locale]))).slice(0, 20);
   const visible = query.trim().length >= (platform === "twitch" ? 2 : 1);
   const current = selected ? `${selected.name} · ID ${selected.id}` : "";
   const visual = selected ? (platform === "twitch" ? categoryImage((selected as TwitchCategory).imageUrl) : `<span class="category-image youtube-category-icon">${(selected as YouTubeCategory).iconSvg}</span>`) : "";
-  return `<div class="autocomplete">${selected && !query ? `<div class="selected-category">${visual}<span>${escapeHtml(current)}</span></div>` : ""}<label>Категория<input data-input="category-query" data-kind="${platform}" data-scope="${scope}" value="${escapeHtml(query)}" placeholder="${escapeHtml(current || "Начните вводить название или ID")}" autocomplete="off"${disabled ? " disabled" : ""} /></label>${visible && !disabled ? `<div class="autocomplete-list">${results.length ? results.map((item) => renderCategoryOption(item, platform, scope)).join("") : '<span class="empty-option">Ничего не найдено</span>'}</div>` : ""}</div>`;
+  return `<div class="autocomplete">${selected && !query ? `<div class="selected-category">${visual}<span>${escapeHtml(current)}</span></div>` : ""}<label>${t("category")}<input data-input="category-query" data-kind="${platform}" data-scope="${scope}" value="${escapeHtml(query)}" placeholder="${escapeHtml(current || t("categorySearch"))}" autocomplete="off"${disabled ? " disabled" : ""} /></label>${visible && !disabled ? `<div class="autocomplete-list">${results.length ? results.map((item) => renderCategoryOption(item, platform, scope)).join("") : `<span class="empty-option">${t("nothingFound")}</span>`}</div>` : ""}</div>`;
 }
 
 function titleCounter(title: string, max: number): string {
@@ -350,21 +400,21 @@ function templatePanel(): string {
   const twitchTitle = titleFromTemplate(draft.twitchTemplate, draft.subtitle);
   const youtubeTitle = titleFromTemplate(draft.youtubeTemplate, draft.subtitle);
   return `<section class="template-panel" aria-labelledby="templates-title">
-    <div class="panel-heading"><h2 id="templates-title">Шаблоны</h2><span class="template-store">Streamer.bot</span></div>
+    <div class="panel-heading"><h2 id="templates-title">${t("templates")}</h2><span class="template-store">Streamer.bot</span></div>
     <div class="template-grid">
-      <label class="subtitle-field">Подзаголовок<input data-input="main-subtitle" value="${escapeHtml(draft.subtitle)}" placeholder="Например: Играем соло рейтинг" /></label>
-      ${syntaxEditor("Шаблон Twitch", "main-twitch-template", draft.twitchTemplate)}
-      ${syntaxEditor("Шаблон YouTube", "main-youtube-template", draft.youtubeTemplate)}
+      <label class="subtitle-field">${t("subtitle")}<input data-input="main-subtitle" value="${escapeHtml(draft.subtitle)}" placeholder="${escapeHtml(t("subtitleExample"))}" /></label>
+      ${syntaxEditor(t("twitchTemplate"), "main-twitch-template", draft.twitchTemplate)}
+      ${syntaxEditor(t("youtubeTemplate"), "main-youtube-template", draft.youtubeTemplate)}
     </div>
     <div class="template-preview-grid"><div class="template-preview"><span>Twitch</span><strong>${renderTemplateValue(draft.twitchTemplate, draft.subtitle)}</strong>${titleCounter(twitchTitle, 140)}</div><div class="template-preview"><span>YouTube</span><strong>${renderTemplateValue(draft.youtubeTemplate, draft.subtitle)}</strong>${titleCounter(youtubeTitle, 100)}</div></div>
-    ${valid ? "" : '<p class="form-errors">%subtitle% допускается не более одного раза в каждом шаблоне.</p>'}
-    <div class="template-actions">${button("Сбросить", "reset-main-templates", { icon: uiIcon("refresh") })}${button(state.templatesSaving ? "Сохраняем…" : "Сохранить шаблоны", "save-templates", { className: "button primary", icon: uiIcon("braces"), disabled: !valid || state.templatesSaving })}</div>
+    ${valid ? "" : `<p class="form-errors">${t("templateValidation")}</p>`}
+    <div class="template-actions">${button(t("reset"), "reset-main-templates", { icon: uiIcon("refresh") })}${button(state.templatesSaving ? t("saving") : t("saveTemplates"), "save-templates", { className: "button primary", icon: uiIcon("braces"), disabled: !valid || state.templatesSaving })}</div>
   </section>`;
 }
 
 function presetPanel(): string {
   const actions = state.presetActions;
-  return `<section class="preset-panel" aria-labelledby="presets-title"><div class="panel-heading"><h2 id="presets-title">Пресеты</h2><span class="preset-count">${actions.length}</span></div>${actions.length ? `<div class="preset-list">${actions.map((preset) => button(state.runningPresetId === preset.id ? "Запускаем…" : preset.label, "run-preset", { className: "button preset-button", icon: uiIcon("play"), disabled: state.runningPresetId !== null, data: ` data-preset-id="${escapeHtml(preset.id)}" data-preset-name="${escapeHtml(preset.name)}"` })).join("")}</div>` : '<p class="panel-hint">Добавьте Action в группу <code>STREAM INFO</code> и назовите его <code>PRESET | Название игры</code>.</p>'}</section>`;
+  return `<section class="preset-panel" aria-labelledby="presets-title"><div class="panel-heading"><h2 id="presets-title">${t("presets")}</h2><span class="preset-count">${actions.length}</span></div>${actions.length ? `<div class="preset-list">${actions.map((preset) => button(state.runningPresetId === preset.id ? t("running") : preset.label, "run-preset", { className: "button preset-button", icon: uiIcon("play"), disabled: state.runningPresetId !== null, data: ` data-preset-id="${escapeHtml(preset.id)}" data-preset-name="${escapeHtml(preset.name)}"` })).join("")}</div>` : `<p class="panel-hint">${t("presetsEmpty")}</p>`}</section>`;
 }
 
 function editModal(): string {
@@ -376,16 +426,16 @@ function editModal(): string {
   const displayTitle = form.titleMode === "subtitle" ? renderTemplateValue(template, form.subtitle) : escapeHtml(form.title);
   const validation = validateEdit(form, actualTitle);
   return `<div class="modal-backdrop"><section class="modal" role="dialog" aria-modal="true" aria-labelledby="edit-title">
-    <div class="modal-header"><div><span class="eyebrow">${form.platform === "twitch" ? "Twitch" : "YouTube"}</span><h2 id="edit-title">Изменить информацию</h2></div>${iconButton("close-modal", "Закрыть", renderIcon("close"))}</div>
+    <div class="modal-header"><div><span class="eyebrow">${form.platform === "twitch" ? "Twitch" : "YouTube"}</span><h2 id="edit-title">${t("editInfo")}</h2></div>${iconButton("close-modal", t("close"), renderIcon("close"))}</div>
     <div class="modal-body">
-      <div class="field-group"><div class="mode-toggle"><button type="button" data-action="title-mode" data-mode="subtitle" class="${form.titleMode === "subtitle" ? "active" : ""}">По шаблону</button><button type="button" data-action="title-mode" data-mode="full" class="${form.titleMode === "full" ? "active" : ""}">Полное название</button></div>
-        ${form.titleMode === "subtitle" ? `<label>Подзаголовок<input data-input="edit-subtitle" value="${escapeHtml(form.subtitle)}" /></label><div class="title-preview"><span>Итоговое название</span><strong>${displayTitle}</strong>${titleCounter(actualTitle, max)}</div>` : `<label>Название<input data-input="edit-title" value="${escapeHtml(form.title)}" /></label><div class="field-note">${titleCounter(form.title, max)}</div>`}
+      <div class="field-group"><div class="mode-toggle"><button type="button" data-action="title-mode" data-mode="subtitle" class="${form.titleMode === "subtitle" ? "active" : ""}">${t("byTemplate")}</button><button type="button" data-action="title-mode" data-mode="full" class="${form.titleMode === "full" ? "active" : ""}">${t("fullTitle")}</button></div>
+        ${form.titleMode === "subtitle" ? `<label>${t("subtitle")}<input data-input="edit-subtitle" value="${escapeHtml(form.subtitle)}" /></label><div class="title-preview"><span>${t("finalTitle")}</span><strong>${displayTitle}</strong>${titleCounter(actualTitle, max)}</div>` : `<label>${t("title")}<input data-input="edit-title" value="${escapeHtml(form.title)}" /></label><div class="field-note">${titleCounter(form.title, max)}</div>`}
       </div>
       ${categoryControl(form.platform, form.category, form.categoryQuery, "edit", false)}
-      <label>Теги${renderTagInput(form.tags, form.tagDraft, "edit", false)}</label>
+      <label>${t("tags")}${renderTagInput(form.tags, form.tagDraft, "edit", false)}</label>
       ${validation.length ? `<p class="form-errors">${validation.map(escapeHtml).join("<br />")}</p>` : ""}
     </div>
-    <div class="modal-footer">${button("Отмена", "close-modal")}${button("Сохранить", "save-edit", { className: "button primary", disabled: validation.length > 0 || state.loadingPlatforms.has(form.platform) })}</div>
+    <div class="modal-footer">${button(t("cancel"), "close-modal")}${button(t("save"), "save-edit", { className: "button primary", disabled: validation.length > 0 || state.loadingPlatforms.has(form.platform) })}</div>
   </section></div>`;
 }
 
@@ -397,7 +447,8 @@ function allSection(platform: Platform, form: AllForm, enabled: boolean): string
   const query = platform === "twitch" ? form.twitchCategoryQuery : form.youtubeCategoryQuery;
   const tags = platform === "twitch" ? form.twitchTags : form.youtubeTags;
   const draft = platform === "twitch" ? form.twitchTagDraft : form.youtubeTagDraft;
-  return `<fieldset class="all-platform ${!enabled ? "unavailable" : ""}"${enabled ? "" : " disabled"}><legend>${platform === "twitch" ? "Twitch" : "YouTube"}</legend>${!enabled ? '<p class="youtube-warning">Стрим YouTube должен быть запущен</p>' : ""}<div class="title-preview"><span>Предпросмотр названия ${platform === "twitch" ? "Twitch" : "YouTube"}</span><strong>${renderTemplateValue(template, form.subtitle)}</strong>${titleCounter(title, max)}</div>${categoryControl(platform, category, query, `all-${platform}`, !enabled)}<label>Теги${renderTagInput(tags, draft, `all-${platform}`, !enabled)}</label></fieldset>`;
+  const platformName = platform === "twitch" ? "Twitch" : "YouTube";
+  return `<fieldset class="all-platform ${!enabled ? "unavailable" : ""}"${enabled ? "" : " disabled"}><legend>${platformName}</legend>${!enabled ? `<p class="youtube-warning">${t("youtubeNotStarted")}</p>` : ""}<div class="title-preview"><span>${t("titlePreview", { platform: platformName })}</span><strong>${renderTemplateValue(template, form.subtitle)}</strong>${titleCounter(title, max)}</div>${categoryControl(platform, category, query, `all-${platform}`, !enabled)}<label>${t("tags")}${renderTagInput(tags, draft, `all-${platform}`, !enabled)}</label></fieldset>`;
 }
 
 function allModal(): string {
@@ -405,23 +456,23 @@ function allModal(): string {
   if (!form || !state.stream) return "";
   const errors = validateAll(form);
   return `<div class="modal-backdrop"><section class="modal wide" role="dialog" aria-modal="true" aria-labelledby="all-title">
-    <div class="modal-header"><div><span class="eyebrow">Обе платформы</span><h2 id="all-title">Обновить все</h2></div>${iconButton("close-modal", "Закрыть", renderIcon("close"))}</div>
-    <div class="modal-body"><label>Подзаголовок<input data-input="all-subtitle" value="${escapeHtml(form.subtitle)}" /></label><div class="all-grid">${allSection("twitch", form, Boolean(state.stream.twitch.connected))}${allSection("youtube", form, Boolean(state.stream.youtube.connected && state.stream.youtube.live && state.stream.youtube.broadcastId))}</div>${errors.length ? `<p class="form-errors">${errors.map(escapeHtml).join("<br />")}</p>` : ""}</div>
-    <div class="modal-footer">${button("Отмена", "close-modal")}${button("Применить", "save-all", { className: "button primary", disabled: errors.length > 0 || state.loadingPlatforms.size > 0 })}</div>
+    <div class="modal-header"><div><span class="eyebrow">${t("bothPlatforms")}</span><h2 id="all-title">${t("updateAll")}</h2></div>${iconButton("close-modal", t("close"), renderIcon("close"))}</div>
+    <div class="modal-body"><label>${t("subtitle")}<input data-input="all-subtitle" value="${escapeHtml(form.subtitle)}" /></label><div class="all-grid">${allSection("twitch", form, Boolean(state.stream.twitch.connected))}${allSection("youtube", form, Boolean(state.stream.youtube.connected && state.stream.youtube.live && state.stream.youtube.broadcastId))}</div>${errors.length ? `<p class="form-errors">${errors.map(escapeHtml).join("<br />")}</p>` : ""}</div>
+    <div class="modal-footer">${button(t("cancel"), "close-modal")}${button(t("apply"), "save-all", { className: "button primary", disabled: errors.length > 0 || state.loadingPlatforms.size > 0 })}</div>
   </section></div>`;
 }
 
 function settingsModal(): string {
   const draft = state.settingsDraft;
   return `<div class="modal-backdrop"><section class="modal settings-modal" role="dialog" aria-modal="true" aria-labelledby="settings-title">
-    <div class="modal-header"><div><span class="eyebrow">Подключение</span><h2 id="settings-title">Настройки</h2></div>${iconButton("close-modal", "Закрыть", renderIcon("close"))}</div>
-    <div class="modal-body"><h3>Подключение к Streamer.bot</h3><div class="settings-grid"><label>Host<input data-input="settings-host" value="${escapeHtml(draft.host)}" /></label><label>Port<input data-input="settings-port" type="number" min="1" max="65535" value="${escapeHtml(draft.port)}" /></label></div><label>Endpoint<input data-input="settings-endpoint" value="${escapeHtml(draft.endpoint)}" /></label><label>Password<input data-input="settings-password" type="password" value="${escapeHtml(draft.password)}" autocomplete="current-password" /></label><label class="check-row"><input data-input="settings-remember" type="checkbox"${draft.rememberPassword ? " checked" : ""} />Запомнить пароль</label></div>
-    <div class="modal-footer">${button("Сохранить", "save-settings", { className: "button primary" })}</div>
+    <div class="modal-header"><div><span class="eyebrow">${t("connection")}</span><h2 id="settings-title">${t("settings")}</h2></div>${iconButton("close-modal", t("close"), renderIcon("close"))}</div>
+    <div class="modal-body"><h3>${t("connectionToStreamerbot")}</h3><div class="settings-grid"><label>Host<input data-input="settings-host" value="${escapeHtml(draft.host)}" /></label><label>Port<input data-input="settings-port" type="number" min="1" max="65535" value="${escapeHtml(draft.port)}" /></label></div><label>Endpoint<input data-input="settings-endpoint" value="${escapeHtml(draft.endpoint)}" /></label><label>${t("password")}<input data-input="settings-password" type="password" value="${escapeHtml(draft.password)}" autocomplete="current-password" /></label><label class="check-row"><input data-input="settings-remember" type="checkbox"${draft.rememberPassword ? " checked" : ""} />${t("rememberPassword")}</label></div>
+    <div class="modal-footer">${button(t("save"), "save-settings", { className: "button primary" })}</div>
   </section></div>`;
 }
 
 function noticesHtml(): string {
-  return `<div class="notices">${state.notices.map((notice) => `<aside class="notice"><div><strong>${escapeHtml(notice.title)}</strong>${notice.lines.map((line) => `<p>${escapeHtml(line)}</p>`).join("")}</div>${iconButton("close-notice", "Закрыть уведомление", renderIcon("close"), false, ` data-notice-id="${notice.id}"`)}</aside>`).join("")}</div>`;
+  return `<div class="notices">${state.notices.map((notice) => `<aside class="notice"><div><strong>${escapeHtml(notice.title)}</strong>${notice.lines.map((line) => `<p>${escapeHtml(line)}</p>`).join("")}</div>${iconButton("close-notice", t("closeNotice"), renderIcon("close"), false, ` data-notice-id="${notice.id}"`)}</aside>`).join("")}</div>`;
 }
 
 function focusedField(): { input: string; scope: string; start: number | null; end: number | null } | null {
@@ -512,7 +563,7 @@ async function connect(): Promise<void> {
   render();
   for (const pending of requestResolvers.values()) {
     clearTimeout(pending.timer);
-    pending.reject(new Error("Подключение к Streamer.bot изменилось."));
+    pending.reject(new Error(t("connectionChanged")));
   }
   requestResolvers = new Map();
   if (client) {
@@ -535,7 +586,7 @@ async function connect(): Promise<void> {
       render();
     },
     onError: (error: unknown) => {
-      const message = error instanceof Error ? error.message : "Не удалось подключиться к WebSocket Streamer.bot.";
+      const message = error instanceof Error ? error.message : t("connectFailed");
       state.connectionError = message;
       state.connection = "disconnected";
       state.authNeeded = /auth|password|credential/i.test(message) || Boolean(settings.password);
@@ -547,7 +598,7 @@ async function connect(): Promise<void> {
   try {
     await next.connect();
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Не удалось подключиться к Streamer.bot.";
+    const message = error instanceof Error ? error.message : t("connectFailed");
     state.connection = "disconnected";
     state.connectionError = message;
     state.authNeeded = /auth|password|credential/i.test(message) || Boolean(settings.password);
@@ -579,7 +630,7 @@ async function verifyAction(): Promise<void> {
     if (state.actionStatus === "ready") await refreshState();
   } catch (error) {
     state.connection = "disconnected";
-    state.connectionError = error instanceof Error ? error.message : "Не удалось получить список Actions.";
+    state.connectionError = error instanceof Error ? error.message : t("actionsFailed");
     state.authNeeded = /auth|password|credential/i.test(state.connectionError);
   } finally {
     actionCheckRunning = false;
@@ -588,12 +639,12 @@ async function verifyAction(): Promise<void> {
 }
 
 async function callAction(command: string, payload: Record<string, unknown> = {}): Promise<ActionResponse> {
-  if (!client?.ready || !state.action) throw new Error("Action Streamer.bot пока недоступен.");
+  if (!client?.ready || !state.action) throw new Error(t("actionUnavailable"));
   const requestId = uuid();
   const reply = new Promise<ActionResponse>((resolve, reject) => {
     const timer = window.setTimeout(() => {
       requestResolvers.delete(requestId);
-      reject(new Error("Streamer.bot не прислал ответ за 15 секунд."));
+      reject(new Error(t("actionTimeout")));
     }, REQUEST_TIMEOUT);
     requestResolvers.set(requestId, { resolve, reject, timer });
   });
@@ -617,13 +668,13 @@ async function saveTemplates(): Promise<void> {
   render();
   try {
     const response = await callAction("saveTemplates", { ...draft });
-    if (!response.ok || !response.data) throw new Error(response.error?.message ?? "Streamer.bot не сохранил шаблоны.");
+    if (!response.ok || !response.data) throw new Error(response.error?.message ?? t("templateStateSaveFailed"));
     const templates = normalizeTemplates(response.data.templates);
     syncTemplates({ ...templates, configured: true });
     state.templatesDirty = false;
-    notify("Шаблоны сохранены", ["Они сохранены в Streamer.bot и доступны вашим Action-пресетам."]);
+    notify(t("templateSaved"), [t("templateSavedDescription")]);
   } catch (error) {
-    notify("Не удалось сохранить шаблоны", [error instanceof Error ? error.message : "Неизвестная ошибка."]);
+    notify(t("templateSaveFailed"), [error instanceof Error ? error.message : t("unknownError")]);
   } finally {
     state.templatesSaving = false;
     render();
@@ -638,9 +689,9 @@ async function persistSubtitle(subtitle: string): Promise<void> {
   if (!client?.ready || !state.action) return;
   try {
     const response = await callAction("saveTemplates", { twitchTemplate: settings.twitchTemplate, youtubeTemplate: settings.youtubeTemplate, subtitle: value });
-    if (!response.ok) throw new Error(response.error?.message ?? "Streamer.bot не сохранил подзаголовок.");
+    if (!response.ok) throw new Error(response.error?.message ?? t("subtitleStateSaveFailed"));
   } catch (error) {
-    notify("Подзаголовок не сохранён в Streamer.bot", [error instanceof Error ? error.message : "Неизвестная ошибка."]);
+    notify(t("subtitleSaveFailed"), [error instanceof Error ? error.message : t("unknownError")]);
   }
 }
 
@@ -651,9 +702,9 @@ async function runPreset(id: string, name: string): Promise<void> {
   try {
     await client.doAction({ id }, {});
     window.setTimeout(() => { void refreshState(false); }, 700);
-    notify("Action-пресет запущен", [name]);
+    notify(t("presetStarted"), [name]);
   } catch (error) {
-    notify("Не удалось запустить Action-пресет", [error instanceof Error ? error.message : "Неизвестная ошибка."]);
+    notify(t("presetStartFailed"), [error instanceof Error ? error.message : t("unknownError")]);
   } finally {
     state.runningPresetId = null;
     render();
@@ -664,7 +715,7 @@ async function refreshState(showError = true): Promise<void> {
   if (state.actionStatus !== "ready") return;
   try {
     const response = await callAction("getState");
-    if (!response.ok || !response.data) throw new Error(response.error?.message ?? "Action не вернул данные.");
+    if (!response.ok || !response.data) throw new Error(response.error?.message ?? t("actionStateFailed"));
     const stream = normalizeStream(response.data);
     if (stream.apiVersion !== API_VERSION || response.apiVersion !== API_VERSION) {
       state.actionStatus = "outdated";
@@ -675,7 +726,7 @@ async function refreshState(showError = true): Promise<void> {
     state.stream = stream;
     state.lastUpdated = new Date();
   } catch (error) {
-    if (showError) notify("Не удалось обновить данные", [error instanceof Error ? error.message : "Неизвестная ошибка."]);
+    if (showError) notify(t("refreshFailed"), [error instanceof Error ? error.message : t("unknownError")]);
   } finally {
     render();
   }
@@ -742,22 +793,22 @@ function tagsEqual(a: string[], b: string[]): boolean {
 
 function validateTwitch(title: string, tags: string[]): string[] {
   const errors: string[] = [];
-  if (!title.trim()) errors.push("Название Twitch обязательно.");
-  if (title.length > 140) errors.push("Название Twitch: максимум 140 символов.");
-  if (tags.length > 10) errors.push("Twitch: максимум 10 тегов.");
-  if (tags.some((tag) => !tag.trim() || tag.length > 25 || /\s/.test(tag))) errors.push("Теги Twitch: до 25 символов, без пробелов.");
-  if (new Set(tags.map((tag) => tag.toLocaleLowerCase("ru-RU"))).size !== tags.length) errors.push("Теги Twitch не должны повторяться.");
+  if (!title.trim()) errors.push(t("twitchTitleRequired"));
+  if (title.length > 140) errors.push(t("twitchTitleTooLong"));
+  if (tags.length > 10) errors.push(t("twitchTagsTooMany"));
+  if (tags.some((tag) => !tag.trim() || tag.length > 25 || /\s/.test(tag))) errors.push(t("twitchTagsInvalid"));
+  if (new Set(tags.map((tag) => tag.toLocaleLowerCase(localeTag[locale]))).size !== tags.length) errors.push(t("twitchTagsDuplicate"));
   return errors;
 }
 
 function validateYouTube(title: string, tags: string[]): string[] {
   const errors: string[] = [];
-  if (!title.trim()) errors.push("Название YouTube обязательно.");
-  if (title.length > 100) errors.push("Название YouTube: максимум 100 символов.");
-  if (/[<>]/.test(title)) errors.push("Название YouTube не может содержать < или >.");
-  if (tags.join(",").length > 500) errors.push("Общий размер тегов YouTube: максимум 500 символов.");
-  if (tags.some((tag) => !tag.trim())) errors.push("Тег не может быть пустым.");
-  if (new Set(tags.map((tag) => tag.toLocaleLowerCase("ru-RU"))).size !== tags.length) errors.push("Теги YouTube не должны повторяться.");
+  if (!title.trim()) errors.push(t("youtubeTitleRequired"));
+  if (title.length > 100) errors.push(t("youtubeTitleTooLong"));
+  if (/[<>]/.test(title)) errors.push(t("youtubeTitleInvalid"));
+  if (tags.join(",").length > 500) errors.push(t("youtubeTagsTooLong"));
+  if (tags.some((tag) => !tag.trim())) errors.push(t("tagEmpty"));
+  if (new Set(tags.map((tag) => tag.toLocaleLowerCase(localeTag[locale]))).size !== tags.length) errors.push(t("youtubeTagsDuplicate"));
   return errors;
 }
 
@@ -786,9 +837,9 @@ function flashCard(platform: Platform, ok: boolean): void {
 
 function fieldsToLines(fields: unknown, platform: Platform): string[] {
   const source = isRecord(fields) ? fields : {};
-  const labels: Record<string, string> = { title: "Название", category: "Категория", tags: "Теги" };
-  const lines = Object.entries(source).map(([key, value]) => `${labels[key] ?? key}: ${value === true ? "успешно" : "ошибка"}`);
-  return lines.length ? lines : [platform === "twitch" ? "Изменения Twitch не применены." : "Изменения YouTube не применены."];
+  const labels: Record<string, string> = { title: t("title"), category: t("category"), tags: t("tags") };
+  const lines = Object.entries(source).map(([key, value]) => `${labels[key] ?? key}: ${value === true ? t("fieldSuccess") : t("fieldError")}`);
+  return lines.length ? lines : [platform === "twitch" ? t("twitchChangesFailed") : t("youtubeChangesFailed")];
 }
 
 async function updatePlatform(platform: Platform, payload: Record<string, unknown>): Promise<boolean> {
@@ -799,12 +850,12 @@ async function updatePlatform(platform: Platform, payload: Record<string, unknow
     const response = await callAction(platform === "twitch" ? "updateTwitch" : "updateYouTube", payload);
     const ok = response.ok;
     flashCard(platform, ok);
-    if (!ok) notify(`Не удалось изменить ${platform === "twitch" ? "Twitch" : "YouTube"}`, fieldsToLines(response.data?.fields, platform));
+    if (!ok) notify(t("updateFailed", { platform: platform === "twitch" ? "Twitch" : "YouTube" }), fieldsToLines(response.data?.fields, platform));
     await refreshState(false);
     return ok;
   } catch (error) {
     flashCard(platform, false);
-    notify(`Не удалось изменить ${platform === "twitch" ? "Twitch" : "YouTube"}`, [error instanceof Error ? error.message : "Неизвестная ошибка."]);
+    notify(t("updateFailed", { platform: platform === "twitch" ? "Twitch" : "YouTube" }), [error instanceof Error ? error.message : t("unknownError")]);
     await refreshState(false);
     return false;
   } finally {
@@ -832,7 +883,7 @@ async function saveEdit(): Promise<void> {
     if (category && category.name !== current.categoryName) payload.categoryName = category.name;
   }
   if (!tagsEqual(form.tags, asStringArray(current.tags))) payload.tags = form.tags;
-  if (!Object.keys(payload).length) { notify("Нет изменений", ["Значения уже совпадают с текущими."]); return; }
+  if (!Object.keys(payload).length) { notify(t("unchanged"), [t("unchangedDescription")]); return; }
   if (form.titleMode === "subtitle") {
     await persistSubtitle(form.subtitle);
   }
@@ -865,8 +916,8 @@ async function saveAll(): Promise<void> {
   const jobs: Promise<boolean>[] = [];
   if (Object.keys(twitchPayload).length) jobs.push(updatePlatform("twitch", twitchPayload));
   if (youtubeAvailable && Object.keys(youtubePayload).length) jobs.push(updatePlatform("youtube", youtubePayload));
-  if (!youtubeAvailable) notify("YouTube: Пропущено", ["Стрим YouTube должен быть запущен."]);
-  if (!jobs.length) { if (youtubeAvailable) notify("Нет изменений", ["Значения уже совпадают с текущими."]); return; }
+  if (!youtubeAvailable) notify(t("youtubeSkipped"), [t("youtubeNotStarted")]);
+  if (!jobs.length) { if (youtubeAvailable) notify(t("unchanged"), [t("unchangedDescription")]); return; }
   const results = await Promise.all(jobs);
   if (results.every(Boolean)) clearModal();
 }
@@ -876,7 +927,7 @@ function addTag(scope: string): void {
   if (!holder) return;
   const value = holder.draft.trim();
   if (!value) return;
-  if (!holder.tags.some((tag) => tag.localeCompare(value, "ru", { sensitivity: "accent" }) === 0)) holder.tags.push(value);
+  if (!holder.tags.some((tag) => tag.localeCompare(value, locale, { sensitivity: "accent" }) === 0)) holder.tags.push(value);
   holder.setDraft("");
   render();
 }
@@ -911,7 +962,7 @@ function scheduleTwitchSearch(query: string): void {
       if (state.twitchSearchFor !== requested) return;
       state.twitchResults = result.filter(isRecord).map((item) => ({ id: String(item.id ?? ""), name: String(item.name ?? ""), imageUrl: String(item.imageUrl ?? "") })).filter((item) => item.id && item.name);
     } catch (error) {
-      if (state.twitchSearchFor === requested) notify("Не удалось найти категорию Twitch", [error instanceof Error ? error.message : "Неизвестная ошибка."]);
+      if (state.twitchSearchFor === requested) notify(t("categorySearchFailed"), [error instanceof Error ? error.message : t("unknownError")]);
     }
     render();
   }, 300);
@@ -1016,7 +1067,7 @@ app.addEventListener("click", (event) => {
     case "save-all": void saveAll(); break;
     case "save-templates": void saveTemplates(); break;
     case "reset-main-templates": state.templateDraft = { twitchTemplate: DEFAULT_TWITCH_TEMPLATE, youtubeTemplate: DEFAULT_YOUTUBE_TEMPLATE, subtitle: state.templateDraft.subtitle }; state.templatesDirty = true; render(); break;
-    case "run-preset": void runPreset(target.dataset.presetId ?? "", target.dataset.presetName ?? "Action-пресет"); break;
+    case "run-preset": void runPreset(target.dataset.presetId ?? "", target.dataset.presetName ?? t("presetDefault")); break;
     case "save-settings": {
       settings = { ...state.settingsDraft, endpoint: state.settingsDraft.endpoint || "/", port: Math.max(1, Math.min(65535, Number(state.settingsDraft.port) || 8080)) };
       saveSettings(); clearModal(); void connect(); break;
@@ -1042,6 +1093,11 @@ function startPolling(): void {
   }, 30_000);
 }
 
-render();
-startPolling();
-void connect();
+if (DEMO_MODE) {
+  enableDemoMode();
+  render();
+} else {
+  render();
+  startPolling();
+  void connect();
+}
