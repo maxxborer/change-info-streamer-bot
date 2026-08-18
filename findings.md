@@ -20,6 +20,7 @@
 - An official import decodes to the `SBAE` header followed by gzip-compressed JSON. The generated package has that envelope, one Action in `STREAM INFO`, one C# sub-action (`type: 99999`), and byte-for-byte source parity with `streamerbot/action.cs`.
 - The isolated Streamer.bot 1.0.7 instance compiled the current C# source, accepted correct WebSocket authentication while rejecting a wrong password, and returned a correlated `Custom.CodeEvent` for `getState`.
 - Opening the built HTML directly through `file://` in a clean headless Chrome profile rendered the UI and reached the local Streamer.bot WebSocket without a web server or external JS/CSS loads. The connection was read-only during this check.
+- Streamer.bot 1.0.7 rejects an import whose metadata declares `minimumVersion: "1.0.7"`, despite reporting its own version as 1.0.7. The generated Import now declares 1.0.6 as its compatibility floor and keeps `exportedFrom: "1.0.7"`; a build-time decoder guards that invariant.
 
 ## Resources
 

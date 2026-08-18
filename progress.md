@@ -1,5 +1,21 @@
 # Progress — change-info-streamer-bot
 
+## 2026-08-18
+
+### Import compatibility repair
+
+- **Status:** complete
+- Reported reproduction: Streamer.bot 1.0.7 rejected the generated import while the dialog stated that both the current and required versions were 1.0.7.
+- Root cause: the generated payload set `minimumVersion` to the exact exporter version at both the package and metadata levels.
+- Fix: set the compatibility floor to 1.0.6 while retaining `exportedFrom: 1.0.7`; current 1.0.7 therefore passes the importer guard and the Action code is unchanged.
+- Added `scripts/verify-import.mjs`, invoked by the normal build, to reject an `SBAE` package whose compatibility floor is equal to or higher than its exporter version.
+
+| Check | Result | Notes |
+| --- | --- | --- |
+| Reproduction assertion | pass | The prior package correctly failed the new guard because both values were 1.0.7. |
+| Rebuilt Import package | pass | `SBAE`, one `STREAM INFO | API` C# Action, and metadata/root minimum 1.0.6 verified. |
+| Full build | pass | Import generation, verification, strict TypeScript, and single-file Vite build succeeded. |
+
 ## 2026-08-17
 
 ### Implementation and validation

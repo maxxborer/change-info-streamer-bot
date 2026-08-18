@@ -32,7 +32,7 @@ Implementation, build, and isolated Streamer.bot validation are complete. The on
 | --- | --- |
 | Single HTML from Vite | Required for direct double-click use without a local server. |
 | One Action with CodeEvent replies | `DoAction` acknowledges dispatch only; per-request replies avoid conflict between open pages. |
-| Native export format | The import uses the same `SBAE` gzip/base64 envelope and 1.0.7 action schema as official examples; its bytecode was separately compiled by an isolated real instance. |
+| Native export format | The import uses the same `SBAE` gzip/base64 envelope and 1.0.7 action schema as official examples; its bytecode was separately compiled by an isolated real instance. Its compatibility floor is 1.0.6 because the 1.0.7 importer rejects an equal 1.0.7 minimum version. |
 
 ## Known risks
 

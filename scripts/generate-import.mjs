@@ -4,6 +4,10 @@ import { dirname, resolve } from "node:path";
 
 const project = resolve(import.meta.dirname, "..");
 const actionSource = readFileSync(resolve(project, "streamerbot/action.cs"), "utf8");
+const EXPORTED_FROM = "1.0.7";
+// Streamer.bot 1.0.7 rejects an import when minimumVersion equals its own
+// version, so the compatibility floor must stay below the exporter version.
+const MINIMUM_COMPATIBLE_VERSION = "1.0.6";
 
 // This is the Streamer.bot 1.0.x export schema: SBAE + gzip + base64.  The
 // shape was cross-checked against an official Streamer.bot import and the
@@ -54,7 +58,7 @@ const exported = {
     version: "1.0.0",
     description: "One Action API for the standalone Stream Info HTML.",
     autoRunAction: null,
-    minimumVersion: "1.0.7",
+    minimumVersion: MINIMUM_COMPATIBLE_VERSION,
   },
   data: {
     actions: [action],
@@ -65,8 +69,8 @@ const exported = {
     timers: [],
   },
   version: 10,
-  exportedFrom: "1.0.7",
-  minimumVersion: "1.0.7",
+  exportedFrom: EXPORTED_FROM,
+  minimumVersion: MINIMUM_COMPATIBLE_VERSION,
 };
 
 const importCode = Buffer.concat([Buffer.from("SBAE", "ascii"), gzipSync(Buffer.from(JSON.stringify(exported), "utf8"))]).toString("base64");
