@@ -27,6 +27,7 @@ export interface YouTubeState {
   connected: boolean;
   live: boolean;
   accountName?: string;
+  channelId?: string;
   broadcastId?: string;
   status?: string;
   title?: string;

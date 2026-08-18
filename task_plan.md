@@ -6,7 +6,7 @@ Deliver a single self-contained `change-info-streamer-bot.html` that works direc
 
 ## Status
 
-Implementation, build, and isolated Streamer.bot validation are complete. The Action API was then extended to version 2 with persistent template globals and Action-driven presets. The only checks intentionally outside automation are real Twitch/YouTube account mutations and clicking the updated Import dialog in the user's production application.
+Implementation, build, and isolated Streamer.bot validation are complete. The Action API was then extended to version 3 with persistent template globals, Action-driven presets, and the YouTube channel ID required for a reliable Studio fallback. The only checks intentionally outside automation are real Twitch/YouTube account mutations and clicking the updated Import dialog in the user's production application.
 
 ## Phase
 
@@ -39,4 +39,4 @@ Implementation, build, and isolated Streamer.bot validation are complete. The Ac
 
 - No Twitch/YouTube account was connected to the isolated test instance, so live/offline data and mutating platform calls remain owner-account acceptance checks.
 - The isolated test deliberately did not automate clicking the Import dialog: it validates the exact decoded payload and compiled Action, while keeping the user's production application untouched.
-- The API v2 import was structurally verified, but it has not been imported into the user's production Streamer.bot. Reimport it before using Action-driven presets.
+- The API v3 import was structurally verified, but it has not been imported into the user's production Streamer.bot. Reimport it before using Action-driven presets or the channel-specific YouTube Studio link.

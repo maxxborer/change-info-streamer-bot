@@ -9,7 +9,7 @@ using Newtonsoft.Json.Linq;
 
 public class CPHInline
 {
-    private const int ApiVersion = 2;
+    private const int ApiVersion = 3;
     private const string ReplyEvent = "stream_info_api_response";
     private const string DefaultTwitchTemplate = "🔴 %subtitle%| !tg !yt !tw !donate";
     private const string DefaultYouTubeTemplate = "🔴 [PUBG] %subtitle%| !tg !yt !tw !donate";
@@ -268,6 +268,9 @@ public class CPHInline
             var broadcaster = CPH.YouTubeGetBroadcaster();
             var broadcast = CPH.YouTubeGetLatestMonitoredBroadcast();
             bool live = broadcast != null && string.Equals(broadcast.Status, "live", StringComparison.OrdinalIgnoreCase);
+            string channelId = broadcaster == null ? "" : broadcaster.UserId ?? "";
+            if (string.IsNullOrWhiteSpace(channelId) && broadcast != null)
+                channelId = broadcast.ChannelId ?? "";
 
             if (broadcast == null)
             {
@@ -275,7 +278,8 @@ public class CPHInline
                 {
                     ["connected"] = broadcaster != null,
                     ["live"] = false,
-                    ["accountName"] = broadcaster == null ? "" : broadcaster.UserName ?? ""
+                    ["accountName"] = broadcaster == null ? "" : broadcaster.UserName ?? "",
+                    ["channelId"] = channelId
                 };
             }
 
@@ -283,6 +287,7 @@ public class CPHInline
             {
                 ["connected"] = broadcaster != null,
                 ["accountName"] = broadcaster == null ? "" : broadcaster.UserName ?? "",
+                ["channelId"] = channelId,
                 ["live"] = live,
                 ["broadcastId"] = broadcast.Id ?? "",
                 ["status"] = broadcast.Status ?? "",

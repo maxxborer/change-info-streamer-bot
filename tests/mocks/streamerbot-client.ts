@@ -12,9 +12,9 @@ const presetAction: ActionShape = { id: "preset-pubg", name: "PRESET | PUBG", gr
 
 function defaultState() {
   return {
-    apiVersion: 2,
+    apiVersion: 3,
     twitch: { connected: true, live: true, accountName: "Twitch account", login: "tester", title: "Twitch title", categoryId: "493057", categoryName: "PUBG: BATTLEGROUNDS", categoryImageUrl: "", tags: ["PUBG"] },
-    youtube: { connected: true, live: true, accountName: "YouTube account", broadcastId: "video-1", status: "live", title: "YouTube title", categoryId: "20", categoryName: "Видеоигры", tags: ["PUBG"] },
+    youtube: { connected: true, live: true, accountName: "YouTube account", channelId: "UC-test-channel", broadcastId: "video-1", status: "live", title: "YouTube title", categoryId: "20", categoryName: "Видеоигры", tags: ["PUBG"] },
     templates: { twitchTemplate: "🔴 %subtitle%| !tg", youtubeTemplate: "🔴 [PUBG] %subtitle%| !yt", subtitle: "Старт", configured: true },
   };
 }
@@ -86,7 +86,7 @@ export class StreamerbotClient {
       mockStreamerbot.state.templates = { twitchTemplate: String(payload.twitchTemplate ?? ""), youtubeTemplate: String(payload.youtubeTemplate ?? ""), subtitle: String(payload.subtitle ?? ""), configured: true };
       data = { templates: mockStreamerbot.state.templates };
     }
-    const response = { apiVersion: 2, requestId: String(args.requestId ?? ""), command, ok: true, data, error: null };
+    const response = { apiVersion: 3, requestId: String(args.requestId ?? ""), command, ok: true, data, error: null };
     queueMicrotask(() => this.handlers.get("Custom.CodeEvent")?.({ data: { eventName: "stream_info_api_response", args: response } }));
   }
 }

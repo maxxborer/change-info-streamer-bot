@@ -143,6 +143,13 @@ describe("Stream Info HTML actions", () => {
     expect(commands()).toContain("updateYouTube");
   });
 
+  it("opens the known YouTube broadcast in Studio before falling back to channel settings", async () => {
+    await boot();
+    const links = document.querySelectorAll<HTMLButtonElement>('[data-action="open-link"]');
+    links[3]?.click();
+    expect(open).toHaveBeenCalledWith("https://studio.youtube.com/video/video-1/livestreaming", "_blank", "noopener,noreferrer");
+  });
+
   it("closes notices and verifies import-screen copy/toggle/check actions", async () => {
     mockStreamerbot.actions = [];
     await boot();
@@ -188,6 +195,6 @@ describe("Stream Info HTML actions", () => {
     const links = document.querySelectorAll<HTMLButtonElement>('[data-action="open-link"]');
     expect(links[3]?.disabled).toBe(false);
     links[3]?.click();
-    expect(open).toHaveBeenCalledWith("https://studio.youtube.com/", "_blank", "noopener,noreferrer");
+    expect(open).toHaveBeenCalledWith("https://studio.youtube.com/channel/UC-test-channel/livestreaming/dashboard", "_blank", "noopener,noreferrer");
   });
 });

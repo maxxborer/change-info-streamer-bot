@@ -9,7 +9,7 @@
 - Replaced the hand-authored interface/platform/category artwork with bundled Lucide and Simple Icons SVG assets. Brand and stroke icons now use separate presentation rules.
 - Fixed the modal-close regression: only a click on the backdrop itself closes a modal; input clicks remain inside it. Focus and text selection survive a state re-render.
 - Moved template editing to the main screen and added `%subtitle%` syntax highlighting. An empty subtitle stays visibly marked as `%subtitle%`; a supplied subtitle is highlighted separately in the previews.
-- Bumped the API Action to version 2. It now persists templates/subtitle in Streamer.bot global variables, accepts `saveTemplates`, and supports `applyPreset` so the user's existing per-game Actions can set globals and call the one API Action.
+- The Action was first raised to version 2 for persistent templates and `applyPreset`; the current version is 3 and also returns the YouTube channel ID for the Studio fallback.
 - Added an automatically discovered `PRESET | ...` button strip for user-created preset Actions in `STREAM INFO`.
 - Kept the YouTube Studio dashboard available even without an active broadcast; the watch link remains disabled until there is a live broadcast.
 
@@ -18,9 +18,16 @@
 | Strict TypeScript | pass | `npm run check` |
 | UI action tests | pass | 6 Vitest tests; every HTML action is invoked with a mocked Streamer.bot client and no real stream data. |
 | Production dependency audit | pass | `npm audit --omit=dev` reports 0 vulnerabilities. |
-| Single-file build | pass | Rebuilt root and `dist` HTML plus the API v2 Import string. |
+| Single-file build | pass | Rebuilt root and `dist` HTML plus the current API v3 Import string. |
 | External JS/CSS inspection | pass | Built HTML contains no external script or stylesheet dependency. |
-| Updated API v2 production import | pending owner acceptance | The generated package is structurally verified; it still needs the user's one-time Import click in the real Streamer.bot instance. |
+| Updated API v3 production import | pending owner acceptance | The generated package is structurally verified; it still needs the user's one-time Import click in the real Streamer.bot instance. |
+
+### YouTube Studio destination
+
+- **Status:** complete
+- API Action version 3 now returns the YouTube channel ID alongside the monitored broadcast data.
+- The dashboard button opens the monitored broadcast's Studio page whenever its ID is known; without one, it opens `https://studio.youtube.com/channel/{USER_ID}/livestreaming/dashboard`.
+- Added tests for both destinations. The full isolated suite now has 8 passing tests.
 
 ### SVG icon rendering repair
 

@@ -19,7 +19,7 @@ import type {
 } from "./types";
 import "./styles.css";
 
-const API_VERSION = 2;
+const API_VERSION = 3;
 const ACTION_GROUP = "STREAM INFO";
 const ACTION_NAME = "STREAM INFO | API";
 const CODE_EVENT = "stream_info_api_response";
@@ -283,7 +283,11 @@ function renderYouTubeCard(youtube: YouTubeState): string {
   const canEdit = Boolean(youtube.connected && youtube.live && youtube.broadcastId);
   const id = youtube.broadcastId ?? "";
   const streamUrl = canEdit ? `https://www.youtube.com/watch?v=${encodeURIComponent(id)}` : "";
-  const dashboardUrl = id ? `https://studio.youtube.com/video/${encodeURIComponent(id)}/livestreaming` : youtube.connected ? "https://studio.youtube.com/" : "";
+  const dashboardUrl = id
+    ? `https://studio.youtube.com/video/${encodeURIComponent(id)}/livestreaming`
+    : youtube.channelId
+      ? `https://studio.youtube.com/channel/${encodeURIComponent(youtube.channelId)}/livestreaming/dashboard`
+      : youtube.connected ? "https://studio.youtube.com/" : "";
   const details = canEdit ? `<div class="card-body"><div class="stream-title"><span>Название</span><strong>${escapeHtml(youtube.title || "—")}</strong></div><div class="stream-meta">${categorySummary(youtubeCategoryIcon(youtube.categoryId), youtube.categoryName, youtube.categoryId)}<div class="tags-section"><span>Теги</span>${tagsHtml(asStringArray(youtube.tags))}</div></div></div>` : "";
   return `<section class="platform-card ${status}${!canEdit ? " compact-unavailable" : ""}${state.cardErrors.youtube ? " card-error" : ""}${state.cardEffects.youtube ? ` card-${state.cardEffects.youtube}` : ""}" data-platform="youtube">
     <div class="card-heading"><div>${platformLogo("youtube")}<div><h2>YouTube</h2><span>${escapeHtml(youtube.accountName || "Аккаунт не подключён")}</span></div></div><span class="live-badge ${status}">${youtube.live ? "В эфире" : "Не запущен"}</span></div>
@@ -461,6 +465,7 @@ function normalizeStream(data: Record<string, unknown>): StreamState {
     connected: youtubeRaw.connected === true,
     live: youtubeRaw.live === true,
     accountName: String(youtubeRaw.accountName ?? ""),
+    channelId: String(youtubeRaw.channelId ?? ""),
     broadcastId: String(youtubeRaw.broadcastId ?? ""),
     status: String(youtubeRaw.status ?? ""),
     title: String(youtubeRaw.title ?? ""),
