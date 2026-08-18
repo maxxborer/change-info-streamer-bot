@@ -1,0 +1,54 @@
+name: Publish release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out the tagged source
+        uses: actions/checkout@v4
+
+      - name: Validate distributable files
+        shell: bash
+        run: |
+          required_files=(
+            dist/change-info-streamer-bot.ru.html
+            dist/change-info-streamer-bot.en.html
+            dist/change-info-streamer-bot.es.html
+            dist/change-info-streamer-bot.zh.html
+          )
+
+          for file in "${required_files[@]}"; do
+            test -s "$file"
+          done
+
+      - name: Package the complete distribution
+        shell: bash
+        run: |
+          mkdir release
+          version="${GITHUB_REF_NAME#v}"
+          (
+            cd dist
+            zip -9 "../release/change-info-streamer-bot-${version}.zip" *.html
+          )
+
+      - name: Publish the distributable files
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" dist/*.html release/*.zip --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" dist/*.html release/*.zip \
+              --title "Stream Info $GITHUB_REF_NAME" \
+              --generate-notes
+          fi

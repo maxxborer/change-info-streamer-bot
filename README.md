@@ -70,7 +70,11 @@ npm test
 npm run build
 ```
 
-`npm run build` regenerates the native Streamer.bot import, checks TypeScript, and emits all four single-file HTML variants. `dist/` is a local build directory and is intentionally not committed.
+`npm run build` regenerates the native Streamer.bot import, checks TypeScript, and emits all four single-file HTML variants. `dist/` is committed because it is the distributable product; include its refreshed files whenever a change affects the build.
+
+## Releases
+
+Pushing a tag named `v*` creates a GitHub Release containing each HTML file from `dist/` and a ZIP archive of the complete distribution. End users can download the language they need without installing Node.js or building the project.
 
 ## Security and support
 
