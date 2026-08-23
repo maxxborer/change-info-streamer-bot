@@ -16,6 +16,31 @@ jobs:
       - name: Check out the tagged source
         uses: actions/checkout@v4
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Validate release version
+        shell: bash
+        run: |
+          package_version="$(node -p "require('./package.json').version")"
+          test "$GITHUB_REF_NAME" = "v${package_version}"
+
+      - name: Test and rebuild distribution
+        shell: bash
+        run: |
+          npm ci
+          npm test
+          npm run build
+          git diff --exit-code
+
       - name: Validate distributable files
         shell: bash
         run: |
