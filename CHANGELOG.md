@@ -2,6 +2,10 @@
 
 [Русская версия](#история-изменений)
 
+## 1.2.2 — 2026-08-23
+
+- Display only the version number without a product-name prefix.
+
 ## 1.2.1 — 2026-08-23
 
 - Show the DockBar version alongside the last-updated timestamp.
@@ -24,6 +28,10 @@
 ## История изменений
 
 [English version](#changelog)
+
+### 1.2.2 — 2026-08-23
+
+- Отображается только номер версии без префикса с названием продукта.
 
 ### 1.2.1 — 2026-08-23
 

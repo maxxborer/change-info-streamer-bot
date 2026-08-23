@@ -215,12 +215,12 @@ describe("Stream Info HTML actions", () => {
     expect(document.querySelector('[data-input="main-subtitle"]')).not.toBeNull();
   });
 
-  it("shows the DockBar version opposite the last-updated time", async () => {
+  it("shows the version opposite the last-updated time", async () => {
     await boot();
 
     const status = document.querySelector<HTMLElement>(".updated-at");
     expect(status?.textContent).toContain("Обновлено:");
-    expect(status?.textContent).toContain(`DockBar v${packageJson.version}`);
+    expect(status?.children[1]?.textContent).toBe(`v${packageJson.version}`);
     expect(status?.children).toHaveLength(2);
   });
 });
