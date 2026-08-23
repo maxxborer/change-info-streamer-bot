@@ -1,4 +1,5 @@
 import { StreamerbotClient } from "@streamerbot/client";
+import packageJson from "../package.json";
 import { brandIcon, uiIcon } from "./icons";
 import { FALLBACK_CATEGORY_SVG, YOUTUBE_CATEGORIES } from "./youtube-categories";
 import STREAMERBOT_IMPORT from "../streamerbot-import.txt?raw";
@@ -21,6 +22,7 @@ import type {
 import "./styles.css";
 
 const API_VERSION = 3;
+const DOCKBAR_VERSION = packageJson.version;
 const ACTION_GROUP = "STREAM INFO";
 const ACTION_NAME = "STREAM INFO | API";
 const CODE_EVENT = "stream_info_api_response";
@@ -356,7 +358,7 @@ function renderMain(): string {
   const stream = state.stream;
   if (!stream) return `<main class="empty-state"><div class="loader"></div><p>${t("loading")}</p></main>`;
   const stamp = state.lastUpdated ? state.lastUpdated.toLocaleTimeString(localeTag[locale], { hour: "2-digit", minute: "2-digit", second: "2-digit" }) : "—";
-  return `<main class="content"><div class="subtitle-top">${subtitlePanel()}</div><div class="cards">${renderTwitchCard(stream.twitch)}${renderYouTubeCard(stream.youtube)}</div><div class="presets-below">${presetPanel()}</div><p class="updated-at">${t("updated")} ${escapeHtml(stamp)}</p></main>`;
+  return `<main class="content"><div class="subtitle-top">${subtitlePanel()}</div><div class="cards">${renderTwitchCard(stream.twitch)}${renderYouTubeCard(stream.youtube)}</div><div class="presets-below">${presetPanel()}</div><div class="updated-at"><span>${t("updated")} ${escapeHtml(stamp)}</span><span>DockBar v${DOCKBAR_VERSION}</span></div></main>`;
 }
 
 function renderCategoryOption(category: TwitchCategory | YouTubeCategory, kind: Platform, scope: string): string {
@@ -509,6 +511,7 @@ function focusedField(): { input: string; scope: string; start: number | null; e
 }
 
 function render(): void {
+  if (!app.isConnected) return;
   const focus = focusedField();
   const primary = state.actionStatus === "missing" || state.actionStatus === "disabled" || state.actionStatus === "outdated" ? renderImport() : renderMain();
   const modal = state.modal === "settings" ? settingsModal() : state.modal === "all" ? allModal() : state.modal === "twitch" || state.modal === "youtube" ? editModal() : "";

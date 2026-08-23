@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { mockStreamerbot } from "./mocks/streamerbot-client";
+import packageJson from "../package.json";
 
 vi.mock("@streamerbot/client", async () => import("./mocks/streamerbot-client"));
 
@@ -212,5 +213,14 @@ describe("Stream Info HTML actions", () => {
     expect(mockStreamerbot.connectCalls).toBe(0);
     expect(document.querySelector('[data-platform="twitch"]')?.textContent).toContain("Maseaaao");
     expect(document.querySelector('[data-input="main-subtitle"]')).not.toBeNull();
+  });
+
+  it("shows the DockBar version opposite the last-updated time", async () => {
+    await boot();
+
+    const status = document.querySelector<HTMLElement>(".updated-at");
+    expect(status?.textContent).toContain("Обновлено:");
+    expect(status?.textContent).toContain(`DockBar v${packageJson.version}`);
+    expect(status?.children).toHaveLength(2);
   });
 });

@@ -2,6 +2,11 @@
 
 [Русская версия](#история-изменений)
 
+## 1.2.1 — 2026-08-23
+
+- Show the DockBar version alongside the last-updated timestamp.
+- Derive the displayed version directly from the release package version.
+
 ## 1.2.0 — 2026-08-23
 
 - Automatically applies the saved YouTube title, category, and tags when Streamer.bot detects that a YouTube broadcast has started.
@@ -19,6 +24,11 @@
 ## История изменений
 
 [English version](#changelog)
+
+### 1.2.1 — 2026-08-23
+
+- Версия DockBar выводится рядом со временем последнего обновления.
+- Отображаемая версия берётся напрямую из версии релизного пакета.
 
 ### 1.2.0 — 2026-08-23
 
