@@ -4,6 +4,7 @@ using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text;
+using System.Threading;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
@@ -20,6 +21,7 @@ public class CPHInline
     private const string YouTubeCategoryKey = "stream_info.preset.youtubeCategoryName";
     private const string TwitchTagsKey = "stream_info.preset.twitchTagsJson";
     private const string YouTubeTagsKey = "stream_info.preset.youtubeTagsJson";
+    private const string AutomaticYouTubeCommand = "applyYouTubePresetOnStart";
 
     public bool Execute()
     {
@@ -32,10 +34,18 @@ public class CPHInline
             CPH.TryGetArg("requestId", out requestId);
             CPH.TryGetArg("payloadJson", out string payloadJson);
 
+            // WebSocket requests always provide a command. The Action's only
+            // native trigger is YouTube Broadcast Started, so an execution
+            // without a command is the automatic metadata application path.
+            if (string.IsNullOrWhiteSpace(command) && string.IsNullOrWhiteSpace(requestId))
+                command = AutomaticYouTubeCommand;
+
             if (string.IsNullOrWhiteSpace(command))
                 throw new InvalidOperationException("Команда не указана.");
             bool shouldReply = !string.IsNullOrWhiteSpace(requestId);
-            if (!shouldReply && !string.Equals(command, "applyPreset", StringComparison.Ordinal))
+            if (!shouldReply &&
+                !string.Equals(command, "applyPreset", StringComparison.Ordinal) &&
+                !string.Equals(command, AutomaticYouTubeCommand, StringComparison.Ordinal))
                 throw new InvalidOperationException("requestId не указан.");
 
             JObject payload = string.IsNullOrWhiteSpace(payloadJson) ? new JObject() : JObject.Parse(payloadJson);
@@ -61,6 +71,9 @@ public class CPHInline
                 case "applyPreset":
                     data = ApplyPreset();
                     break;
+                case AutomaticYouTubeCommand:
+                    data = ApplyYouTubePresetOnStart();
+                    break;
                 default:
                     throw new InvalidOperationException("Неизвестная команда: " + command);
             }
@@ -69,7 +82,9 @@ public class CPHInline
             if (shouldReply)
                 Reply(requestId, command, ok, data, ok ? null : "Не все поля удалось изменить.");
             else if (!ok)
-                CPH.LogError("[STREAM INFO | API] Пресет применён не полностью.");
+                CPH.LogError(string.Equals(command, AutomaticYouTubeCommand, StringComparison.Ordinal)
+                    ? "[STREAM INFO | API] Автоматическое применение параметров YouTube выполнено не полностью."
+                    : "[STREAM INFO | API] Пресет применён не полностью.");
         }
         catch (Exception ex)
         {
@@ -139,14 +154,7 @@ public class CPHInline
         if (twitchTags != null) twitchPayload["tags"] = twitchTags;
         AddPresetResult(platforms, "twitch", twitchPayload, UpdateTwitch, ref allOk);
 
-        JObject youtubePayload = new JObject
-        {
-            ["title"] = TitleFromTemplate(templates.Value<string>("youtubeTemplate"), templates.Value<string>("subtitle"))
-        };
-        string youtubeCategory = CPH.GetGlobalVar<string>(YouTubeCategoryKey, true);
-        if (!string.IsNullOrWhiteSpace(youtubeCategory)) youtubePayload["categoryName"] = youtubeCategory;
-        JArray youtubeTags = GetPresetTags(YouTubeTagsKey);
-        if (youtubeTags != null) youtubePayload["tags"] = youtubeTags;
+        JObject youtubePayload = BuildYouTubePresetPayload(templates);
         try
         {
             var broadcast = CPH.YouTubeGetLatestMonitoredBroadcast();
@@ -163,6 +171,59 @@ public class CPHInline
         }
 
         return new JObject { ["ok"] = allOk, ["platforms"] = platforms };
+    }
+
+    private JObject ApplyYouTubePresetOnStart()
+    {
+        JObject payload = BuildAutomaticYouTubePresetPayload();
+        if (!payload.HasValues)
+        {
+            CPH.LogInfo("[STREAM INFO | API] Автоматическое применение пропущено: параметры YouTube ещё не настроены.");
+            return new JObject { ["ok"] = true, ["skipped"] = true };
+        }
+
+        JObject result = AutomaticYouTubePolicy.RunWhenReady(
+            () =>
+            {
+                var broadcast = CPH.YouTubeGetLatestMonitoredBroadcast();
+                return broadcast != null && string.Equals(broadcast.Status, "live", StringComparison.OrdinalIgnoreCase);
+            },
+            () => Thread.Sleep(1000),
+            () => UpdateYouTube(payload));
+
+        if (result.Value<bool>("ok"))
+            CPH.LogInfo("[STREAM INFO | API] Параметры YouTube автоматически применены после запуска эфира.");
+        return result;
+    }
+
+    private JObject BuildYouTubePresetPayload(JObject templates)
+    {
+        JObject payload = new JObject
+        {
+            ["title"] = TitleFromTemplate(templates.Value<string>("youtubeTemplate"), templates.Value<string>("subtitle"))
+        };
+        string category = CPH.GetGlobalVar<string>(YouTubeCategoryKey, true);
+        if (!string.IsNullOrWhiteSpace(category)) payload["categoryName"] = category;
+        JArray tags = GetPresetTags(YouTubeTagsKey);
+        if (tags != null) payload["tags"] = tags;
+        return payload;
+    }
+
+    private JObject BuildAutomaticYouTubePresetPayload()
+    {
+        JObject payload = new JObject();
+        string template = CPH.GetGlobalVar<string>(YouTubeTemplateKey, true);
+        if (AutomaticYouTubePolicy.HasExplicitTitleTemplate(template))
+        {
+            string subtitle = CPH.GetGlobalVar<string>(SubtitleKey, true) ?? "";
+            payload["title"] = TitleFromTemplate(template, subtitle);
+        }
+
+        string category = CPH.GetGlobalVar<string>(YouTubeCategoryKey, true);
+        if (!string.IsNullOrWhiteSpace(category)) payload["categoryName"] = category;
+        JArray tags = GetPresetTags(YouTubeTagsKey);
+        if (tags != null) payload["tags"] = tags;
+        return payload;
     }
 
     private void AddPresetResult(JObject platforms, string platform, JObject payload, Func<JObject, JObject> update, ref bool allOk)

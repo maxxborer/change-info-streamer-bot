@@ -62,6 +62,8 @@ To create a game preset, make an Action in the `STREAM INFO` group named `PRESET
 
 An empty variable leaves that field unchanged. YouTube is skipped when no broadcast is running, while Twitch can still be updated.
 
+The imported `STREAM INFO | API` Action also subscribes to **YouTube → Broadcast Started**. As soon as a launch is detected, it applies the explicitly saved YouTube title template, subtitle, category, and tags to the new broadcast without changing Twitch. A fresh installation with no saved YouTube values leaves the broadcast unchanged. Re-import [streamerbot-import.txt](streamerbot-import.txt) after upgrading from an earlier version to install the trigger.
+
 ## Development
 
 ```powershell
@@ -70,7 +72,7 @@ npm test
 npm run build
 ```
 
-`npm run build` regenerates the native Streamer.bot import, checks TypeScript, and emits all four single-file HTML variants. `dist/` is committed because it is the distributable product; include its refreshed files whenever a change affects the build.
+The test suite requires Node.js and the .NET 8 SDK. `npm run build` regenerates the native Streamer.bot import, checks TypeScript, and emits all four single-file HTML variants. `dist/` is committed because it is the distributable product; include its refreshed files whenever a change affects the build.
 
 ## Releases
 

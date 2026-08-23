@@ -3,7 +3,10 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 const project = resolve(import.meta.dirname, "..");
-const actionSource = readFileSync(resolve(project, "streamerbot/action.cs"), "utf8");
+const packageMetadata = JSON.parse(readFileSync(resolve(project, "package.json"), "utf8"));
+const policySource = readFileSync(resolve(project, "streamerbot/automatic-youtube-policy.cs"), "utf8");
+const policyBody = policySource.replace(/^using System;\r?\n\r?\n/, "");
+const actionSource = `${readFileSync(resolve(project, "streamerbot/action.cs"), "utf8")}\n${policyBody}`;
 const EXPORTED_FROM = "1.0.7";
 // Streamer.bot 1.0.7 rejects an import when minimumVersion equals its own
 // version, so the compatibility floor must stay below the exporter version.
@@ -22,7 +25,16 @@ const action = {
   alwaysRun: false,
   randomAction: false,
   concurrent: true,
-  triggers: [],
+  triggers: [
+    {
+      // YouTube -> Broadcast -> Started. The numeric trigger type is the
+      // stable Streamer.bot 1.0.x export representation.
+      id: "5f9a1464-3571-4a20-b5ba-0c350db9c15a",
+      type: 4001,
+      enabled: true,
+      exclusions: [],
+    },
+  ],
   actions: [
     {
       name: "STREAM INFO API router",
@@ -55,8 +67,8 @@ const exported = {
   meta: {
     name: "STREAM INFO | API",
     author: "change-info-streamer-bot",
-    version: "1.0.0",
-    description: "One Action API for the standalone Stream Info HTML.",
+    version: packageMetadata.version,
+    description: "One Action API for the standalone Stream Info HTML with automatic YouTube metadata on broadcast start.",
     autoRunAction: null,
     minimumVersion: MINIMUM_COMPATIBLE_VERSION,
   },

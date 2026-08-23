@@ -1,13 +1,13 @@
 {
   "name": "change-info-streamer-bot",
-  "version": "1.0.0",
+  "version": "1.2.0",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "vite",
     "generate-import": "node scripts/generate-import.mjs && node scripts/verify-import.mjs",
     "check": "tsc --noEmit",
-    "test": "vitest run",
+    "test": "vitest run && dotnet run --project tests/csharp/AutomaticYouTubePolicyTests.csproj --configuration Release",
     "build": "npm run generate-import && npm run check && node scripts/build-locales.mjs && node scripts/verify-locales.mjs",
     "preview": "vite preview"
   },

@@ -1,2 +1,4 @@
 node_modules/
 .playwright-cli/
+tests/csharp/bin/
+tests/csharp/obj/
