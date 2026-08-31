@@ -1,0 +1,3 @@
+# Generated distributables: keep them in the repository, but exclude them from GitHub language statistics.
+/change-info-streamer-bot.html linguist-generated=true
+/dist/** linguist-generated=true
