@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+- Hide disabled platform cards, title previews, and combined editor fields while retaining their switches and drafts.
+
 - Add persistent Twitch and YouTube switches to the subtitle and combined editors, excluding disabled platforms from validation and manual updates.
 - Keep platform drafts when toggling and prevent submissions with no selected platform available or while a combined update is pending.
 
@@ -35,6 +37,8 @@
 [English version](#changelog)
 
 ### Не выпущено
+
+- Карточки, предпросмотр названия и поля общего редактора отключённых платформ скрываются; тумблеры и введённые данные сохраняются.
 
 - Добавлены тумблеры Twitch и YouTube в редакторы подзаголовка и общей информации с сохранением выбора в браузере. Отключённые платформы исключаются из проверки и ручных обновлений.
 - Введённые данные сохраняются при переключении; применение блокируется без доступных выбранных платформ и во время общего обновления.

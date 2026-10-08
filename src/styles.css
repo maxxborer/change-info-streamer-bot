@@ -115,4 +115,5 @@ label { display: grid; gap: 4px; color: #c8cfdb; font-size: .7rem; font-weight: 
 .platform-switch input:focus-visible + .switch-track { outline: 2px solid #c4aaff; outline-offset: 3px; }
 .platform-switch input:disabled ~ span { opacity: .55; cursor: default; }
 .template-preview .platform-switch > span { text-transform: none; letter-spacing: normal; }
-.platform-disabled > strong, .platform-disabled > .counter { opacity: .45; }
+.platform-switches { display: flex; flex-wrap: wrap; gap: 16px; }
+.cards > :only-child, .all-grid > :only-child { grid-column: 1 / -1; }

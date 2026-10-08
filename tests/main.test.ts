@@ -72,7 +72,8 @@ describe("Stream Info HTML actions", () => {
     expect(action("save-subtitle").disabled).toBe(true);
     togglePlatform(platform);
     expect(action("save-subtitle").disabled).toBe(false);
-    expect(action(`edit-${platform}`).disabled).toBe(true);
+    expect(document.querySelector(`[data-platform="${platform}"]`)).toBeNull();
+    expect(document.querySelector(`[data-scope="subtitle-${platform}"]`)?.closest(".template-preview")?.querySelector("strong")).toBeNull();
     setValue('[data-input="main-subtitle"]', "Selected platform only");
     click("save-subtitle");
     await flush();
@@ -87,7 +88,9 @@ describe("Stream Info HTML actions", () => {
     setValue('[data-input="all-subtitle"]', "Combined change");
     setValue(`[data-input="tag-draft"][data-scope="all-${platform}"]`, "Draft");
     togglePlatform(platform, "all");
-    expect(document.querySelector<HTMLInputElement>(`[data-input="tag-draft"][data-scope="all-${platform}"]`)?.disabled).toBe(true);
+    expect(document.querySelector(`[data-input="tag-draft"][data-scope="all-${platform}"]`)).toBeNull();
+    expect(document.querySelector(`[data-input="category-query"][data-scope="all-${platform}"]`)).toBeNull();
+    expect(document.querySelectorAll(".all-platform")).toHaveLength(1);
     expect(document.querySelector<HTMLInputElement>(`[data-input="platform-enabled"][data-scope="all-${platform}"]`)?.disabled).toBe(false);
     togglePlatform(platform, "all");
     expect(document.querySelector<HTMLInputElement>(`[data-input="tag-draft"][data-scope="all-${platform}"]`)?.value).toBe("Draft");
@@ -106,6 +109,8 @@ describe("Stream Info HTML actions", () => {
     expect(action("save-subtitle").disabled).toBe(true);
     click("open-all");
     expect(action("save-all").disabled).toBe(true);
+    expect(document.querySelectorAll(".all-platform")).toHaveLength(0);
+    expect(document.querySelectorAll(".platform-card")).toHaveLength(0);
     const before = mockStreamerbot.actionCalls.length;
     click("save-all");
     click("save-subtitle");
@@ -120,6 +125,8 @@ describe("Stream Info HTML actions", () => {
     expect(action("save-subtitle").disabled).toBe(true);
     togglePlatform("twitch");
     expect(action("save-subtitle").disabled).toBe(false);
+    expect(document.querySelector('[data-platform="twitch"]')).not.toBeNull();
+    expect(document.querySelector('[data-platform="youtube"]')).toBeNull();
   });
 
   it("uses availability as well as selection and gives Twitch the correct unavailable reason", async () => {

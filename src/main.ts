@@ -364,7 +364,7 @@ function renderMain(): string {
   const stream = state.stream;
   if (!stream) return `<main class="empty-state"><div class="loader"></div><p>${t("loading")}</p></main>`;
   const stamp = state.lastUpdated ? state.lastUpdated.toLocaleTimeString(localeTag[locale], { hour: "2-digit", minute: "2-digit", second: "2-digit" }) : "—";
-  return `<main class="content"><div class="subtitle-top">${subtitlePanel()}</div><div class="cards">${renderTwitchCard(stream.twitch)}${renderYouTubeCard(stream.youtube)}</div><div class="presets-below">${presetPanel()}</div><div class="updated-at"><span>${t("updated")} ${escapeHtml(stamp)}</span><span>v${APP_VERSION}</span></div></main>`;
+  return `<main class="content"><div class="subtitle-top">${subtitlePanel()}</div><div class="cards">${settings.twitchEnabled ? renderTwitchCard(stream.twitch) : ""}${settings.youtubeEnabled ? renderYouTubeCard(stream.youtube) : ""}</div><div class="presets-below">${presetPanel()}</div><div class="updated-at"><span>${t("updated")} ${escapeHtml(stamp)}</span><span>v${APP_VERSION}</span></div></main>`;
 }
 
 function renderCategoryOption(category: TwitchCategory | YouTubeCategory, kind: Platform, scope: string): string {
@@ -440,8 +440,8 @@ function subtitlePanel(): string {
     <div class="panel-heading"><h2 id="subtitle-title">${t("subtitle")}</h2><span class="template-store">Streamer.bot</span></div>
     <div class="subtitle-grid">
       <label class="subtitle-field">${t("subtitle")}<input data-input="main-subtitle" value="${escapeHtml(subtitle)}" placeholder="${escapeHtml(t("subtitleExample"))}" /></label>
-      <div class="template-preview ${settings.twitchEnabled ? "" : "platform-disabled"}">${platformSwitch("twitch", "subtitle-twitch")}<strong>${renderTemplateValue(settings.twitchTemplate, subtitle)}</strong>${titleCounter(twitchTitle, 140)}</div>
-      <div class="template-preview ${settings.youtubeEnabled ? "" : "platform-disabled"}">${platformSwitch("youtube", "subtitle-youtube")}<strong>${renderTemplateValue(settings.youtubeTemplate, subtitle)}</strong>${titleCounter(youtubeTitle, 100)}</div>
+      <div class="template-preview ${settings.twitchEnabled ? "" : "platform-disabled"}">${platformSwitch("twitch", "subtitle-twitch")}${settings.twitchEnabled ? `<strong>${renderTemplateValue(settings.twitchTemplate, subtitle)}</strong>${titleCounter(twitchTitle, 140)}` : ""}</div>
+      <div class="template-preview ${settings.youtubeEnabled ? "" : "platform-disabled"}">${platformSwitch("youtube", "subtitle-youtube")}${settings.youtubeEnabled ? `<strong>${renderTemplateValue(settings.youtubeTemplate, subtitle)}</strong>${titleCounter(youtubeTitle, 100)}` : ""}</div>
       <div class="subtitle-actions">${button(state.subtitleSaving ? t("saving") : t("apply"), "save-subtitle", { className: "button primary", disabled: errors.length > 0 || editorBusy() || (!platformAvailable("twitch") && !platformAvailable("youtube")) })}</div>
     </div>
     ${errors.length ? `<p class="form-errors">${errors.map(escapeHtml).join("<br />")}</p>` : ""}
@@ -494,6 +494,7 @@ function editModal(): string {
 }
 
 function allSection(platform: Platform, form: AllForm): string {
+  if (!platformEnabled(platform)) return "";
   const enabled = platformAvailable(platform);
   const max = platform === "twitch" ? 140 : 100;
   const template = platform === "twitch" ? settings.twitchTemplate : settings.youtubeTemplate;
@@ -503,7 +504,7 @@ function allSection(platform: Platform, form: AllForm): string {
   const tags = platform === "twitch" ? form.twitchTags : form.youtubeTags;
   const draft = platform === "twitch" ? form.twitchTagDraft : form.youtubeTagDraft;
   const platformName = platform === "twitch" ? "Twitch" : "YouTube";
-  return `<fieldset class="all-platform ${!enabled ? "unavailable" : ""}"${enabled ? "" : " disabled"}><legend>${platformSwitch(platform, `all-${platform}`)}</legend>${platformEnabled(platform) && !enabled ? `<p class="youtube-warning">${platform === "youtube" ? t("youtubeNotStarted") : t("accountNotConnected")}</p>` : ""}<div class="title-preview"><span>${t("titlePreview", { platform: platformName })}</span><strong>${renderTemplateValue(template, form.subtitle)}</strong>${titleCounter(title, max)}</div>${categoryControl(platform, category, query, `all-${platform}`, !enabled)}<label>${t("tags")}${renderTagInput(tags, draft, `all-${platform}`, !enabled)}</label></fieldset>`;
+  return `<fieldset class="all-platform ${!enabled ? "unavailable" : ""}"${enabled ? "" : " disabled"}><legend>${platformName}</legend>${platformEnabled(platform) && !enabled ? `<p class="youtube-warning">${platform === "youtube" ? t("youtubeNotStarted") : t("accountNotConnected")}</p>` : ""}<div class="title-preview"><span>${t("titlePreview", { platform: platformName })}</span><strong>${renderTemplateValue(template, form.subtitle)}</strong>${titleCounter(title, max)}</div>${categoryControl(platform, category, query, `all-${platform}`, !enabled)}<label>${t("tags")}${renderTagInput(tags, draft, `all-${platform}`, !enabled)}</label></fieldset>`;
 }
 
 function allModal(): string {
@@ -512,7 +513,7 @@ function allModal(): string {
   const errors = validateAll(form);
   return `<div class="modal-backdrop"><section class="modal wide" role="dialog" aria-modal="true" aria-labelledby="all-title">
     <div class="modal-header"><div><span class="eyebrow">${t("bothPlatforms")}</span><h2 id="all-title">${t("updateAll")}</h2></div>${iconButton("close-modal", t("close"), renderIcon("close"))}</div>
-    <div class="modal-body"><label>${t("subtitle")}<input data-input="all-subtitle" value="${escapeHtml(form.subtitle)}" /></label><div class="all-grid">${allSection("twitch", form)}${allSection("youtube", form)}</div>${errors.length ? `<p class="form-errors">${errors.map(escapeHtml).join("<br />")}</p>` : ""}</div>
+    <div class="modal-body"><label>${t("subtitle")}<input data-input="all-subtitle" value="${escapeHtml(form.subtitle)}" /></label><div class="platform-switches">${platformSwitch("twitch", "all-twitch")}${platformSwitch("youtube", "all-youtube")}</div><div class="all-grid">${allSection("twitch", form)}${allSection("youtube", form)}</div>${errors.length ? `<p class="form-errors">${errors.map(escapeHtml).join("<br />")}</p>` : ""}</div>
     <div class="modal-footer">${button(t("cancel"), "close-modal")}${button(state.allSaving ? t("saving") : t("apply"), "save-all", { className: "button primary", disabled: errors.length > 0 || editorBusy() || (!platformAvailable("twitch") && !platformAvailable("youtube")) })}</div>
   </section></div>`;
 }
