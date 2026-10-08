@@ -81,18 +81,11 @@ export interface ActionSummary {
 
 export type Platform = "twitch" | "youtube";
 
-export interface EditForm {
-  platform: Platform;
-  titleMode: "subtitle" | "full";
-  subtitle: string;
-  title: string;
-  category: TwitchCategory | YouTubeCategory | null;
-  tags: string[];
-  tagDraft: string;
-  categoryQuery: string;
-}
-
 export interface AllForm {
+  twitchTitle: string;
+  youtubeTitle: string;
+  twitchTitleMode: "subtitle" | "full";
+  youtubeTitleMode: "subtitle" | "full";
   subtitle: string;
   twitchCategory: TwitchCategory | null;
   youtubeCategory: YouTubeCategory | null;

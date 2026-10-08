@@ -48,7 +48,7 @@ For a safe visual tour with sample data, append `?demo=1` to any built HTML file
 
 Title templates are configured in **Settings**. The first workspace block is **Subtitle**: it saves the subtitle and applies the resulting titles to connected Twitch and an active YouTube broadcast. Each template may contain at most one `%subtitle%` token.
 
-Use the Twitch and YouTube switches in **Subtitle** or **Update all** to choose which platforms the editor updates. The selection is shared by both editors and saved in this browser. A disabled platform hides its card, title preview, and combined editor fields while keeping its draft values, and is excluded from validation and all manual title, category, and tag updates; turn it back on to resume editing. Apply is unavailable when no selected platform is ready. Streamer.bot Action presets and Broadcast Started automation use their own settings.
+The Twitch and YouTube switches in **Subtitle** select platforms for updates and save the selection in this browser. Edit titles, categories, and tags directly in the platform cards on the main page. **Use template** generates a title from the shared subtitle; **Full title** supports a manually entered title. Changing the subtitle switches selected platforms to template mode. **Apply** saves changes for available selected platforms. Disabled cards are hidden and retain their drafts for re-enabling. Data refreshes and closing Settings preserve unsaved edits. Streamer.bot Action presets and Broadcast Started automation use their own settings.
 
 To create a game preset, make an Action in the `STREAM INFO` group named `PRESET | Game name`. Set any of the following persistent global variables, then call `STREAM INFO | API` with `command = applyPreset`:
 

@@ -117,3 +117,8 @@ label { display: grid; gap: 4px; color: #c8cfdb; font-size: .7rem; font-weight: 
 .template-preview .platform-switch > span { text-transform: none; letter-spacing: normal; }
 .platform-switches { display: flex; flex-wrap: wrap; gap: 16px; }
 .cards > :only-child, .all-grid > :only-child { grid-column: 1 / -1; }
+
+.inline-editor { min-width: 0; margin: 10px 0 0; padding: 0; border: 0; }
+.inline-editor .tags-section { display: grid; }
+.card-footer { justify-content: flex-end; }
+.subtitle-grid > .platform-switch { align-self: center; }

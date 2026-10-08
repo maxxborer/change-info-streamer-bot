@@ -69,13 +69,13 @@ describe("Stream Info HTML actions", () => {
   it.each(["twitch", "youtube"] as const)("excludes disabled %s from subtitle validation and writes", async (platform) => {
     mockStreamerbot.state[platform].tags = [platform === "twitch" ? "invalid tag" : "x".repeat(501)];
     await boot();
-    expect(action("save-subtitle").disabled).toBe(true);
+    expect(action("save-all").disabled).toBe(true);
     togglePlatform(platform);
-    expect(action("save-subtitle").disabled).toBe(false);
+    expect(action("save-all").disabled).toBe(false);
     expect(document.querySelector(`[data-platform="${platform}"]`)).toBeNull();
-    expect(document.querySelector(`[data-scope="subtitle-${platform}"]`)?.closest(".template-preview")?.querySelector("strong")).toBeNull();
+    expect(document.querySelector(`[data-input="inline-title"][data-kind="${platform}"]`)).toBeNull();
     setValue('[data-input="main-subtitle"]', "Selected platform only");
-    click("save-subtitle");
+    click("save-all");
     await flush();
     expect(commands()).not.toContain(platform === "twitch" ? "updateTwitch" : "updateYouTube");
     expect(commands()).toContain(platform === "twitch" ? "updateYouTube" : "updateTwitch");
@@ -84,47 +84,46 @@ describe("Stream Info HTML actions", () => {
 
   it.each(["twitch", "youtube"] as const)("keeps disabled %s drafts and excludes title, category and tag writes in the combined editor", async (platform) => {
     await boot();
-    click("open-all");
-    setValue('[data-input="all-subtitle"]', "Combined change");
+    setValue('[data-input="main-subtitle"]', "Combined change");
     setValue(`[data-input="tag-draft"][data-scope="all-${platform}"]`, "Draft");
-    togglePlatform(platform, "all");
+    togglePlatform(platform);
     expect(document.querySelector(`[data-input="tag-draft"][data-scope="all-${platform}"]`)).toBeNull();
     expect(document.querySelector(`[data-input="category-query"][data-scope="all-${platform}"]`)).toBeNull();
-    expect(document.querySelectorAll(".all-platform")).toHaveLength(1);
-    expect(document.querySelector<HTMLInputElement>(`[data-input="platform-enabled"][data-scope="all-${platform}"]`)?.disabled).toBe(false);
-    togglePlatform(platform, "all");
+    expect(document.querySelectorAll(".inline-editor")).toHaveLength(1);
+    expect(document.querySelector<HTMLInputElement>(`[data-input="platform-enabled"][data-scope="subtitle-${platform}"]`)?.disabled).toBe(false);
+    togglePlatform(platform);
     expect(document.querySelector<HTMLInputElement>(`[data-input="tag-draft"][data-scope="all-${platform}"]`)?.value).toBe("Draft");
-    togglePlatform(platform, "all");
+    togglePlatform(platform);
     click("save-all");
     expect(action("save-all").disabled).toBe(true);
     await flush();
     expect(commands()).not.toContain(platform === "twitch" ? "updateTwitch" : "updateYouTube");
     expect(commands()).toContain(platform === "twitch" ? "updateYouTube" : "updateTwitch");
+    togglePlatform(platform);
+    expect(document.querySelector<HTMLInputElement>(`[data-input="tag-draft"][data-scope="all-${platform}"]`)?.value).toBe("Draft");
   });
 
   it("prevents any save with both platforms disabled and restores selection after reopening", async () => {
     await boot();
     togglePlatform("twitch");
     togglePlatform("youtube");
-    expect(action("save-subtitle").disabled).toBe(true);
-    click("open-all");
     expect(action("save-all").disabled).toBe(true);
-    expect(document.querySelectorAll(".all-platform")).toHaveLength(0);
+    expect(action("save-all").disabled).toBe(true);
+    expect(document.querySelectorAll(".inline-editor")).toHaveLength(0);
     expect(document.querySelectorAll(".platform-card")).toHaveLength(0);
     const before = mockStreamerbot.actionCalls.length;
     click("save-all");
-    click("save-subtitle");
+    click("save-all");
     await flush();
     expect(mockStreamerbot.actionCalls.length).toBe(before);
-    click("close-modal");
     vi.resetModules();
     document.body.innerHTML = '<div id="app"></div>';
     await boot();
     expect(document.querySelector<HTMLInputElement>('[data-scope="subtitle-twitch"]')?.checked).toBe(false);
     expect(document.querySelector<HTMLInputElement>('[data-scope="subtitle-youtube"]')?.checked).toBe(false);
-    expect(action("save-subtitle").disabled).toBe(true);
+    expect(action("save-all").disabled).toBe(true);
     togglePlatform("twitch");
-    expect(action("save-subtitle").disabled).toBe(false);
+    expect(action("save-all").disabled).toBe(false);
     expect(document.querySelector('[data-platform="twitch"]')).not.toBeNull();
     expect(document.querySelector('[data-platform="youtube"]')).toBeNull();
   });
@@ -133,11 +132,10 @@ describe("Stream Info HTML actions", () => {
     mockStreamerbot.state.twitch.connected = false;
     mockStreamerbot.state.youtube.broadcastId = "";
     await boot();
-    expect(action("save-subtitle").disabled).toBe(true);
-    click("open-all");
     expect(action("save-all").disabled).toBe(true);
-    expect(document.querySelectorAll(".all-platform")[0].textContent).toContain("Аккаунт не подключён");
-    expect(document.querySelectorAll(".all-platform")[0].textContent).not.toContain("Стрим YouTube");
+    expect(action("save-all").disabled).toBe(true);
+    expect(document.querySelectorAll(".inline-editor")[0].textContent).toContain("Аккаунт не подключён");
+    expect(document.querySelectorAll(".inline-editor")[0].textContent).not.toContain("Стрим YouTube");
   });
 
   it("does not report YouTube as skipped when explicitly disabled and offline", async () => {
@@ -145,32 +143,27 @@ describe("Stream Info HTML actions", () => {
     await boot();
     togglePlatform("youtube");
     setValue('[data-input="main-subtitle"]', "Twitch only");
-    click("save-subtitle");
+    click("save-all");
     await flush();
     expect(commands()).toContain("updateTwitch");
     expect(document.querySelector(".notice")?.textContent ?? "").not.toContain("Пропущено");
   });
 
-  it("opens every normal editor action and keeps a modal open when an input is clicked", async () => {
+  it("renders stream editors directly on the main page without editor modals", async () => {
     await boot();
-    click("edit-twitch");
-    expect(document.querySelector(".modal")).not.toBeNull();
-    click("title-mode");
-    const subtitle = document.querySelector<HTMLInputElement>('[data-input="edit-subtitle"]');
-    expect(subtitle).not.toBeNull();
-    subtitle?.click();
-    expect(document.querySelector(".modal")).not.toBeNull();
-    setValue('[data-input="edit-subtitle"]', "Новый подзаголовок");
-    expect(document.querySelector('[data-input="edit-subtitle"]')).not.toBeNull();
+    expect(document.querySelector('[data-action="open-all"]')).toBeNull();
+    expect(document.querySelector('[data-action="edit-twitch"]')).toBeNull();
+    expect(document.querySelector('[data-action="edit-youtube"]')).toBeNull();
+    expect(document.querySelectorAll('.inline-editor')).toHaveLength(2);
+    setValue('[data-input="inline-title"][data-kind="twitch"]', "Inline Twitch title");
+    expect(document.querySelector('.modal')).toBeNull();
+    expect(document.querySelector<HTMLInputElement>('[data-input="inline-title"][data-kind="twitch"]')?.value).toBe("Inline Twitch title");
+    click("refresh-state");
+    await flush();
+    expect(document.querySelector<HTMLInputElement>('[data-input="inline-title"][data-kind="twitch"]')?.value).toBe("Inline Twitch title");
+    click("open-settings");
     click("close-modal");
-    expect(document.querySelector(".modal")).toBeNull();
-
-    click("edit-youtube");
-    expect(document.querySelector(".modal")).not.toBeNull();
-    click("close-modal");
-    click("open-all");
-    expect(document.querySelector(".modal.wide")).not.toBeNull();
-    click("close-modal");
+    expect(document.querySelector<HTMLInputElement>('[data-input="inline-title"][data-kind="twitch"]')?.value).toBe("Inline Twitch title");
   });
 
   it("runs refresh, links, preset, template and settings actions without real platform changes", async () => {
@@ -189,7 +182,7 @@ describe("Stream Info HTML actions", () => {
 
     expect(document.querySelector('[data-input="settings-twitch-template"]')).toBeNull();
     setValue('[data-input="main-subtitle"]', "Тестовый подзаголовок");
-    click("save-subtitle");
+    click("save-all");
     await flush();
     await flush();
     expect(commands()).toContain("saveTemplates");
@@ -209,31 +202,31 @@ describe("Stream Info HTML actions", () => {
     expect(mockStreamerbot.connectCalls).toBeGreaterThan(1);
   });
 
-  it("adds/removes chips, selects a local YouTube category and saves individual changes through mocks", async () => {
+  it("edits titles, categories and tags inline and applies them through mocks", async () => {
     await boot();
-    click("edit-twitch");
-    setValue('[data-input="tag-draft"]', "Rust");
-    const tagDraft = document.querySelector<HTMLInputElement>('[data-input="tag-draft"]');
-    tagDraft?.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
-    expect(document.querySelectorAll('[data-action="remove-tag"]')).toHaveLength(2);
+    setValue('[data-input="tag-draft"][data-scope="all-twitch"]', "Rust");
+    document.querySelector<HTMLInputElement>('[data-input="tag-draft"][data-scope="all-twitch"]')?.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    expect(document.querySelectorAll('[data-scope="all-twitch"][data-action="remove-tag"]')).toHaveLength(2);
     click("remove-tag", 1);
-    expect(document.querySelectorAll('[data-action="remove-tag"]')).toHaveLength(1);
-    setValue('[data-input="edit-title"]', "Новое Twitch название");
-    click("save-edit");
-    await flush();
-    expect(commands()).toContain("updateTwitch");
-
-    click("edit-youtube");
-    setValue('[data-input="category-query"]', "В");
+    expect(document.querySelectorAll('[data-scope="all-twitch"][data-action="remove-tag"]')).toHaveLength(1);
+    setValue('[data-input="inline-title"][data-kind="twitch"]', "Новое Twitch название");
+    setValue('[data-input="inline-title"][data-kind="youtube"]', "Новое YouTube название");
+    setValue('[data-input="category-query"][data-scope="all-youtube"]', "В");
     expect(document.querySelector('[data-action="choose-category"]')).not.toBeNull();
     click("choose-category");
     expect(document.querySelector('[data-action="choose-category"]')).toBeNull();
+    click("save-all");
+    await flush();
+    const twitch = mockStreamerbot.actionCalls.find(call => call.args.command === "updateTwitch");
+    const youtube = mockStreamerbot.actionCalls.find(call => call.args.command === "updateYouTube");
+    expect(JSON.parse(String(twitch?.args.payloadJson))).toMatchObject({title: "Новое Twitch название"});
+    expect(JSON.parse(String(youtube?.args.payloadJson))).toMatchObject({title: "Новое YouTube название"});
+    expect(document.querySelector('.modal')).toBeNull();
   });
 
   it("saves the combined form through mock Action replies and leaves no real side effects", async () => {
     await boot();
-    click("open-all");
-    setValue('[data-input="all-subtitle"]', "Рейтинг");
+    setValue('[data-input="main-subtitle"]', "Рейтинг");
     click("save-all");
     await flush();
     await flush();
@@ -290,7 +283,7 @@ describe("Stream Info HTML actions", () => {
     await boot();
     const youtubeCard = document.querySelector<HTMLElement>('[data-platform="youtube"]');
     expect(youtubeCard?.classList.contains("compact-unavailable")).toBe(true);
-    expect(youtubeCard?.querySelector(".card-body")).toBeNull();
+    expect(youtubeCard?.querySelector(".inline-editor")).toBeNull();
     expect(youtubeCard?.querySelector(".youtube-warning")).not.toBeNull();
     const links = document.querySelectorAll<HTMLButtonElement>('[data-action="open-link"]');
     expect(links[3]?.disabled).toBe(false);
