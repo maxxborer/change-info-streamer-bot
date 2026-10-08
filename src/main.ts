@@ -66,6 +66,7 @@ interface AppState {
   templatesSaving: boolean;
   templatesDirty: boolean;
   subtitleSaving: boolean;
+  allSaving: boolean;
   subtitleDirty: boolean;
   editForm: EditForm | null;
   allForm: AllForm | null;
@@ -89,6 +90,8 @@ const defaults: ConnectionSettings = {
   twitchTemplate: DEFAULT_TWITCH_TEMPLATE,
   youtubeTemplate: DEFAULT_YOUTUBE_TEMPLATE,
   lastSubtitle: "",
+  twitchEnabled: true,
+  youtubeEnabled: true,
 };
 
 function loadSettings(): ConnectionSettings {
@@ -97,6 +100,8 @@ function loadSettings(): ConnectionSettings {
     return {
       ...defaults,
       ...saved,
+      twitchEnabled: saved.twitchEnabled !== false,
+      youtubeEnabled: saved.youtubeEnabled !== false,
       password: saved.rememberPassword ? saved.password ?? "" : "",
       port: Number.isFinite(saved.port) ? Number(saved.port) : defaults.port,
     };
@@ -125,6 +130,7 @@ const state: AppState = {
   templatesSaving: false,
   templatesDirty: false,
   subtitleSaving: false,
+  allSaving: false,
   subtitleDirty: false,
   editForm: null,
   allForm: null,
@@ -329,7 +335,7 @@ function renderTwitchCard(twitch: TwitchState): string {
     <div class="card-heading"><div>${platformLogo("twitch")}<div><h2>Twitch</h2><span>${escapeHtml(twitch.accountName || t("accountNotConnected"))}</span></div></div><span class="live-badge ${status}">${status === "live" ? t("live") : status === "offline" ? t("offline") : t("notConnected")}</span></div>
     ${loading ? `<div class="card-spinner" aria-label="${escapeHtml(t("updating"))}"></div>` : ""}
     <div class="card-body"><div class="stream-title"><span>${t("title")}</span><strong>${escapeHtml(twitch.title || "—")}</strong></div><div class="stream-meta">${categorySummary(categoryImage(twitch.categoryImageUrl), twitch.categoryName, twitch.categoryId)}<div class="tags-section"><span>${t("tags")}</span>${tagsHtml(asStringArray(twitch.tags))}</div></div></div>
-    <div class="card-footer"><div>${button(t("edit"), "edit-twitch", { disabled: !twitch.connected || loading })}</div><div class="card-links">${iconButton("open-link", t("openStream"), renderIcon("external"), !streamUrl, ` data-url="${escapeHtml(streamUrl)}"`)}${iconButton("open-link", t("openDashboard"), renderIcon("dashboard"), !dashboardUrl, ` data-url="${escapeHtml(dashboardUrl)}"`)}</div></div>
+    <div class="card-footer"><div>${button(t("edit"), "edit-twitch", { disabled: !platformAvailable("twitch") || loading })}</div><div class="card-links">${iconButton("open-link", t("openStream"), renderIcon("external"), !streamUrl, ` data-url="${escapeHtml(streamUrl)}"`)}${iconButton("open-link", t("openDashboard"), renderIcon("dashboard"), !dashboardUrl, ` data-url="${escapeHtml(dashboardUrl)}"`)}</div></div>
   </section>`;
 }
 
@@ -350,7 +356,7 @@ function renderYouTubeCard(youtube: YouTubeState): string {
     ${!canEdit ? `<div class="youtube-warning">${t("youtubeNotStarted")}</div>` : ""}
     ${loading ? `<div class="card-spinner" aria-label="${escapeHtml(t("updating"))}"></div>` : ""}
     ${details}
-    <div class="card-footer"><div>${button(t("edit"), "edit-youtube", { disabled: !canEdit || loading })}</div><div class="card-links">${iconButton("open-link", t("openStream"), renderIcon("external"), !streamUrl, ` data-url="${escapeHtml(streamUrl)}"`)}${iconButton("open-link", t("openDashboard"), renderIcon("dashboard"), !dashboardUrl, ` data-url="${escapeHtml(dashboardUrl)}"`)}</div></div>
+    <div class="card-footer"><div>${button(t("edit"), "edit-youtube", { disabled: !platformAvailable("youtube") || loading })}</div><div class="card-links">${iconButton("open-link", t("openStream"), renderIcon("external"), !streamUrl, ` data-url="${escapeHtml(streamUrl)}"`)}${iconButton("open-link", t("openDashboard"), renderIcon("dashboard"), !dashboardUrl, ` data-url="${escapeHtml(dashboardUrl)}"`)}</div></div>
   </section>`;
 }
 
@@ -400,22 +406,43 @@ function syntaxEditor(label: string, input: "settings-twitch-template" | "settin
   return `<label class="syntax-field"><span>${label}</span><span class="syntax-editor"><pre aria-hidden="true">${renderTemplateSource(value)}\n</pre><textarea data-input="${input}" spellcheck="false" rows="2" aria-label="${escapeHtml(label)}">${escapeHtml(value)}</textarea></span></label>`;
 }
 
+function platformEnabled(platform: Platform): boolean {
+  return platform === "twitch" ? settings.twitchEnabled : settings.youtubeEnabled;
+}
+
+function platformAvailable(platform: Platform): boolean {
+  const stream = state.stream;
+  return platformEnabled(platform) && Boolean(platform === "twitch"
+    ? stream?.twitch.connected
+    : stream?.youtube.connected && stream.youtube.live && stream.youtube.broadcastId);
+}
+
+function editorBusy(): boolean {
+  return state.subtitleSaving || state.allSaving || state.loadingPlatforms.size > 0;
+}
+
+function platformSwitch(platform: Platform, scope: string): string {
+  const enabled = platformEnabled(platform);
+  const name = platform === "twitch" ? "Twitch" : "YouTube";
+  return `<label class="platform-switch"><input type="checkbox" role="switch" data-input="platform-enabled" data-scope="${scope}" data-kind="${platform}" aria-label="${escapeHtml(t("enablePlatform", { platform: name }))}"${enabled ? " checked" : ""}${editorBusy() ? " disabled" : ""} /><span class="switch-track" aria-hidden="true"></span><span>${name} · ${enabled ? t("platformEnabled") : t("platformDisabled")}</span></label>`;
+}
+
 function subtitlePanel(): string {
   const stream = state.stream;
   const subtitle = state.templateDraft.subtitle;
   const twitchTitle = titleFromTemplate(settings.twitchTemplate, subtitle);
   const youtubeTitle = titleFromTemplate(settings.youtubeTemplate, subtitle);
   const errors = [
-    ...(stream?.twitch.connected ? validateTwitch(twitchTitle, asStringArray(stream.twitch.tags)) : []),
-    ...(stream?.youtube.connected && stream.youtube.live ? validateYouTube(youtubeTitle, asStringArray(stream.youtube.tags)) : []),
+    ...(platformAvailable("twitch") ? validateTwitch(twitchTitle, asStringArray(stream?.twitch.tags)) : []),
+    ...(platformAvailable("youtube") ? validateYouTube(youtubeTitle, asStringArray(stream?.youtube.tags)) : []),
   ];
   return `<section class="subtitle-panel" aria-labelledby="subtitle-title">
     <div class="panel-heading"><h2 id="subtitle-title">${t("subtitle")}</h2><span class="template-store">Streamer.bot</span></div>
     <div class="subtitle-grid">
       <label class="subtitle-field">${t("subtitle")}<input data-input="main-subtitle" value="${escapeHtml(subtitle)}" placeholder="${escapeHtml(t("subtitleExample"))}" /></label>
-      <div class="template-preview"><span>Twitch</span><strong>${renderTemplateValue(settings.twitchTemplate, subtitle)}</strong>${titleCounter(twitchTitle, 140)}</div>
-      <div class="template-preview"><span>YouTube</span><strong>${renderTemplateValue(settings.youtubeTemplate, subtitle)}</strong>${titleCounter(youtubeTitle, 100)}</div>
-      <div class="subtitle-actions">${button(state.subtitleSaving ? t("saving") : t("apply"), "save-subtitle", { className: "button primary", disabled: errors.length > 0 || state.subtitleSaving })}</div>
+      <div class="template-preview ${settings.twitchEnabled ? "" : "platform-disabled"}">${platformSwitch("twitch", "subtitle-twitch")}<strong>${renderTemplateValue(settings.twitchTemplate, subtitle)}</strong>${titleCounter(twitchTitle, 140)}</div>
+      <div class="template-preview ${settings.youtubeEnabled ? "" : "platform-disabled"}">${platformSwitch("youtube", "subtitle-youtube")}<strong>${renderTemplateValue(settings.youtubeTemplate, subtitle)}</strong>${titleCounter(youtubeTitle, 100)}</div>
+      <div class="subtitle-actions">${button(state.subtitleSaving ? t("saving") : t("apply"), "save-subtitle", { className: "button primary", disabled: errors.length > 0 || editorBusy() || (!platformAvailable("twitch") && !platformAvailable("youtube")) })}</div>
     </div>
     ${errors.length ? `<p class="form-errors">${errors.map(escapeHtml).join("<br />")}</p>` : ""}
   </section>`;
@@ -466,7 +493,8 @@ function editModal(): string {
   </section></div>`;
 }
 
-function allSection(platform: Platform, form: AllForm, enabled: boolean): string {
+function allSection(platform: Platform, form: AllForm): string {
+  const enabled = platformAvailable(platform);
   const max = platform === "twitch" ? 140 : 100;
   const template = platform === "twitch" ? settings.twitchTemplate : settings.youtubeTemplate;
   const title = titleFromTemplate(template, form.subtitle);
@@ -475,7 +503,7 @@ function allSection(platform: Platform, form: AllForm, enabled: boolean): string
   const tags = platform === "twitch" ? form.twitchTags : form.youtubeTags;
   const draft = platform === "twitch" ? form.twitchTagDraft : form.youtubeTagDraft;
   const platformName = platform === "twitch" ? "Twitch" : "YouTube";
-  return `<fieldset class="all-platform ${!enabled ? "unavailable" : ""}"${enabled ? "" : " disabled"}><legend>${platformName}</legend>${!enabled ? `<p class="youtube-warning">${t("youtubeNotStarted")}</p>` : ""}<div class="title-preview"><span>${t("titlePreview", { platform: platformName })}</span><strong>${renderTemplateValue(template, form.subtitle)}</strong>${titleCounter(title, max)}</div>${categoryControl(platform, category, query, `all-${platform}`, !enabled)}<label>${t("tags")}${renderTagInput(tags, draft, `all-${platform}`, !enabled)}</label></fieldset>`;
+  return `<fieldset class="all-platform ${!enabled ? "unavailable" : ""}"${enabled ? "" : " disabled"}><legend>${platformSwitch(platform, `all-${platform}`)}</legend>${platformEnabled(platform) && !enabled ? `<p class="youtube-warning">${platform === "youtube" ? t("youtubeNotStarted") : t("accountNotConnected")}</p>` : ""}<div class="title-preview"><span>${t("titlePreview", { platform: platformName })}</span><strong>${renderTemplateValue(template, form.subtitle)}</strong>${titleCounter(title, max)}</div>${categoryControl(platform, category, query, `all-${platform}`, !enabled)}<label>${t("tags")}${renderTagInput(tags, draft, `all-${platform}`, !enabled)}</label></fieldset>`;
 }
 
 function allModal(): string {
@@ -484,8 +512,8 @@ function allModal(): string {
   const errors = validateAll(form);
   return `<div class="modal-backdrop"><section class="modal wide" role="dialog" aria-modal="true" aria-labelledby="all-title">
     <div class="modal-header"><div><span class="eyebrow">${t("bothPlatforms")}</span><h2 id="all-title">${t("updateAll")}</h2></div>${iconButton("close-modal", t("close"), renderIcon("close"))}</div>
-    <div class="modal-body"><label>${t("subtitle")}<input data-input="all-subtitle" value="${escapeHtml(form.subtitle)}" /></label><div class="all-grid">${allSection("twitch", form, Boolean(state.stream.twitch.connected))}${allSection("youtube", form, Boolean(state.stream.youtube.connected && state.stream.youtube.live && state.stream.youtube.broadcastId))}</div>${errors.length ? `<p class="form-errors">${errors.map(escapeHtml).join("<br />")}</p>` : ""}</div>
-    <div class="modal-footer">${button(t("cancel"), "close-modal")}${button(t("apply"), "save-all", { className: "button primary", disabled: errors.length > 0 || state.loadingPlatforms.size > 0 })}</div>
+    <div class="modal-body"><label>${t("subtitle")}<input data-input="all-subtitle" value="${escapeHtml(form.subtitle)}" /></label><div class="all-grid">${allSection("twitch", form)}${allSection("youtube", form)}</div>${errors.length ? `<p class="form-errors">${errors.map(escapeHtml).join("<br />")}</p>` : ""}</div>
+    <div class="modal-footer">${button(t("cancel"), "close-modal")}${button(state.allSaving ? t("saving") : t("apply"), "save-all", { className: "button primary", disabled: errors.length > 0 || editorBusy() || (!platformAvailable("twitch") && !platformAvailable("youtube")) })}</div>
   </section></div>`;
 }
 
@@ -731,13 +759,13 @@ async function persistSubtitle(subtitle: string): Promise<boolean> {
 
 async function saveSubtitle(): Promise<void> {
   const stream = state.stream;
-  if (!stream) return;
+  if (!stream || editorBusy() || (!platformAvailable("twitch") && !platformAvailable("youtube"))) return;
   const subtitle = state.templateDraft.subtitle;
   const twitchTitle = titleFromTemplate(settings.twitchTemplate, subtitle);
   const youtubeTitle = titleFromTemplate(settings.youtubeTemplate, subtitle);
   const errors = [
-    ...(stream.twitch.connected ? validateTwitch(twitchTitle, asStringArray(stream.twitch.tags)) : []),
-    ...(stream.youtube.connected && stream.youtube.live ? validateYouTube(youtubeTitle, asStringArray(stream.youtube.tags)) : []),
+    ...(platformAvailable("twitch") ? validateTwitch(twitchTitle, asStringArray(stream?.twitch.tags)) : []),
+    ...(platformAvailable("youtube") ? validateYouTube(youtubeTitle, asStringArray(stream?.youtube.tags)) : []),
   ];
   if (errors.length) { render(); return; }
 
@@ -746,10 +774,10 @@ async function saveSubtitle(): Promise<void> {
   try {
     if (!await persistSubtitle(subtitle)) return;
     const updates: Promise<boolean>[] = [];
-    if (stream.twitch.connected && twitchTitle !== stream.twitch.title) updates.push(updatePlatform("twitch", { title: twitchTitle }));
-    const youtubeAvailable = Boolean(stream.youtube.connected && stream.youtube.live && stream.youtube.broadcastId);
+    if (platformAvailable("twitch") && twitchTitle !== stream.twitch.title) updates.push(updatePlatform("twitch", { title: twitchTitle }));
+    const youtubeAvailable = platformAvailable("youtube");
     if (youtubeAvailable && youtubeTitle !== stream.youtube.title) updates.push(updatePlatform("youtube", { title: youtubeTitle }));
-    if (!youtubeAvailable) notify(t("youtubeSkipped"), [t("youtubeNotStarted")]);
+    if (settings.youtubeEnabled && !youtubeAvailable) notify(t("youtubeSkipped"), [t("youtubeNotStarted")]);
     await Promise.all(updates);
   } finally {
     state.subtitleSaving = false;
@@ -806,7 +834,7 @@ function categoryFromState(platform: Platform): TwitchCategory | YouTubeCategory
 }
 
 function openEdit(platform: Platform): void {
-  if (!state.stream) return;
+  if (!state.stream || !platformAvailable(platform)) return;
   const current = state.stream[platform];
   if (!current.connected || (platform === "youtube" && !current.live)) return;
   state.editForm = {
@@ -880,8 +908,8 @@ function validateEdit(form: EditForm, title: string): string[] {
 
 function validateAll(form: AllForm): string[] {
   const messages: string[] = [];
-  if (state.stream?.twitch.connected) messages.push(...validateTwitch(titleFromTemplate(settings.twitchTemplate, form.subtitle), form.twitchTags));
-  if (state.stream?.youtube.connected && state.stream.youtube.live) messages.push(...validateYouTube(titleFromTemplate(settings.youtubeTemplate, form.subtitle), form.youtubeTags));
+  if (platformAvailable("twitch")) messages.push(...validateTwitch(titleFromTemplate(settings.twitchTemplate, form.subtitle), form.twitchTags));
+  if (platformAvailable("youtube")) messages.push(...validateYouTube(titleFromTemplate(settings.youtubeTemplate, form.subtitle), form.youtubeTags));
   return messages;
 }
 
@@ -929,7 +957,7 @@ async function updatePlatform(platform: Platform, payload: Record<string, unknow
 async function saveEdit(): Promise<void> {
   const form = state.editForm;
   const stream = state.stream;
-  if (!form || !stream) return;
+  if (!form || !stream || !platformAvailable(form.platform) || editorBusy()) return;
   const current = stream[form.platform];
   const template = form.platform === "twitch" ? settings.twitchTemplate : settings.youtubeTemplate;
   const title = form.titleMode === "subtitle" ? titleFromTemplate(template, form.subtitle) : form.title.trim();
@@ -956,32 +984,39 @@ async function saveEdit(): Promise<void> {
 async function saveAll(): Promise<void> {
   const form = state.allForm;
   const stream = state.stream;
-  if (!form || !stream) return;
+  if (!form || !stream || editorBusy() || (!platformAvailable("twitch") && !platformAvailable("youtube"))) return;
   const errors = validateAll(form);
   if (errors.length) { render(); return; }
-  if (!await persistSubtitle(form.subtitle)) return;
-  const twitchPayload: Record<string, unknown> = {};
-  const twitchTitle = titleFromTemplate(settings.twitchTemplate, form.subtitle);
-  if (stream.twitch.connected) {
-    if (twitchTitle !== stream.twitch.title) twitchPayload.title = twitchTitle;
-    if (form.twitchCategory && form.twitchCategory.id !== stream.twitch.categoryId) twitchPayload.categoryId = form.twitchCategory.id;
-    if (!tagsEqual(form.twitchTags, asStringArray(stream.twitch.tags))) twitchPayload.tags = form.twitchTags;
+  state.allSaving = true;
+  render();
+  try {
+    if (!await persistSubtitle(form.subtitle)) return;
+    const twitchPayload: Record<string, unknown> = {};
+    const twitchTitle = titleFromTemplate(settings.twitchTemplate, form.subtitle);
+    if (platformAvailable("twitch")) {
+      if (twitchTitle !== stream.twitch.title) twitchPayload.title = twitchTitle;
+      if (form.twitchCategory && form.twitchCategory.id !== stream.twitch.categoryId) twitchPayload.categoryId = form.twitchCategory.id;
+      if (!tagsEqual(form.twitchTags, asStringArray(stream.twitch.tags))) twitchPayload.tags = form.twitchTags;
+    }
+    const youtubePayload: Record<string, unknown> = {};
+    const youtubeAvailable = platformAvailable("youtube");
+    if (youtubeAvailable) {
+      const youtubeTitle = titleFromTemplate(settings.youtubeTemplate, form.subtitle);
+      if (youtubeTitle !== stream.youtube.title) youtubePayload.title = youtubeTitle;
+      if (form.youtubeCategory && form.youtubeCategory.name !== stream.youtube.categoryName) youtubePayload.categoryName = form.youtubeCategory.name;
+      if (!tagsEqual(form.youtubeTags, asStringArray(stream.youtube.tags))) youtubePayload.tags = form.youtubeTags;
+    }
+    const jobs: Promise<boolean>[] = [];
+    if (Object.keys(twitchPayload).length) jobs.push(updatePlatform("twitch", twitchPayload));
+    if (youtubeAvailable && Object.keys(youtubePayload).length) jobs.push(updatePlatform("youtube", youtubePayload));
+    if (settings.youtubeEnabled && !youtubeAvailable) notify(t("youtubeSkipped"), [t("youtubeNotStarted")]);
+    if (!jobs.length) { if (!settings.youtubeEnabled || youtubeAvailable) notify(t("unchanged"), [t("unchangedDescription")]); return; }
+    const results = await Promise.all(jobs);
+    if (results.every(Boolean)) clearModal();
+  } finally {
+    state.allSaving = false;
+    render();
   }
-  const youtubePayload: Record<string, unknown> = {};
-  const youtubeAvailable = Boolean(stream.youtube.connected && stream.youtube.live && stream.youtube.broadcastId);
-  if (youtubeAvailable) {
-    const youtubeTitle = titleFromTemplate(settings.youtubeTemplate, form.subtitle);
-    if (youtubeTitle !== stream.youtube.title) youtubePayload.title = youtubeTitle;
-    if (form.youtubeCategory && form.youtubeCategory.name !== stream.youtube.categoryName) youtubePayload.categoryName = form.youtubeCategory.name;
-    if (!tagsEqual(form.youtubeTags, asStringArray(stream.youtube.tags))) youtubePayload.tags = form.youtubeTags;
-  }
-  const jobs: Promise<boolean>[] = [];
-  if (Object.keys(twitchPayload).length) jobs.push(updatePlatform("twitch", twitchPayload));
-  if (youtubeAvailable && Object.keys(youtubePayload).length) jobs.push(updatePlatform("youtube", youtubePayload));
-  if (!youtubeAvailable) notify(t("youtubeSkipped"), [t("youtubeNotStarted")]);
-  if (!jobs.length) { if (youtubeAvailable) notify(t("unchanged"), [t("unchangedDescription")]); return; }
-  const results = await Promise.all(jobs);
-  if (results.every(Boolean)) clearModal();
 }
 
 function addTag(scope: string): void {
@@ -1042,6 +1077,16 @@ function updateInput(target: HTMLInputElement | HTMLTextAreaElement): void {
   const scope = target.dataset.scope ?? "";
   if (!input) return;
   switch (input) {
+    case "platform-enabled": {
+      const platform = target.dataset.kind as Platform;
+      if (!(target instanceof HTMLInputElement) || editorBusy() || (platform !== "twitch" && platform !== "youtube")) return;
+      if (platform === "twitch") settings.twitchEnabled = target.checked;
+      else settings.youtubeEnabled = target.checked;
+      state.settingsDraft.twitchEnabled = settings.twitchEnabled;
+      state.settingsDraft.youtubeEnabled = settings.youtubeEnabled;
+      saveSettings();
+      break;
+    }
     case "auth-password": settings.password = target.value; break;
     case "settings-host": state.settingsDraft.host = target.value.trim(); break;
     case "settings-port": state.settingsDraft.port = Number(target.value); break;

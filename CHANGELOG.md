@@ -2,6 +2,11 @@
 
 [Русская версия](#история-изменений)
 
+## Unreleased
+
+- Add persistent Twitch and YouTube switches to the subtitle and combined editors, excluding disabled platforms from validation and manual updates.
+- Keep platform drafts when toggling and prevent submissions with no selected platform available or while a combined update is pending.
+
 ## 1.2.2 — 2026-08-23
 
 - Display only the version number without a product-name prefix.
@@ -28,6 +33,11 @@
 ## История изменений
 
 [English version](#changelog)
+
+### Не выпущено
+
+- Добавлены тумблеры Twitch и YouTube в редакторы подзаголовка и общей информации с сохранением выбора в браузере. Отключённые платформы исключаются из проверки и ручных обновлений.
+- Введённые данные сохраняются при переключении; применение блокируется без доступных выбранных платформ и во время общего обновления.
 
 ### 1.2.2 — 2026-08-23
 

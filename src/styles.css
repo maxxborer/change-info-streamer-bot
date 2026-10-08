@@ -105,3 +105,14 @@ label { display: grid; gap: 4px; color: #c8cfdb; font-size: .7rem; font-weight: 
   .tags-section { align-items: flex-start; }
   .subtitle-grid, .template-grid { grid-template-columns: 1fr; }
 }
+
+.platform-switch { display: inline-flex; align-items: center; gap: 7px; cursor: pointer; font-size: .7rem; font-weight: 700; }
+.platform-switch input { position: absolute; width: 1px; height: 1px; min-height: 0; padding: 0; opacity: 0; }
+.platform-switch .switch-track { position: relative; display: inline-block; width: 30px; height: 18px; flex: none; border: 1px solid #68748c; border-radius: 999px; background: #354055; }
+.platform-switch .switch-track::after { position: absolute; top: 2px; left: 2px; width: 12px; height: 12px; border-radius: 50%; background: #fff; content: ""; }
+.platform-switch input:checked + .switch-track { background: #7855be; border-color: #b59be8; }
+.platform-switch input:checked + .switch-track::after { left: 14px; }
+.platform-switch input:focus-visible + .switch-track { outline: 2px solid #c4aaff; outline-offset: 3px; }
+.platform-switch input:disabled ~ span { opacity: .55; cursor: default; }
+.template-preview .platform-switch > span { text-transform: none; letter-spacing: normal; }
+.platform-disabled > strong, .platform-disabled > .counter { opacity: .45; }

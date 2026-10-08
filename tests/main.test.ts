@@ -59,6 +59,91 @@ describe("Stream Info HTML actions", () => {
     vi.unstubAllGlobals();
   });
 
+
+  function togglePlatform(platform: "twitch" | "youtube", scope = "subtitle"): void {
+    const input = document.querySelector<HTMLInputElement>(`[data-input="platform-enabled"][data-scope="${scope}-${platform}"]`);
+    if (!input) throw new Error("Platform switch missing");
+    input.click();
+  }
+
+  it.each(["twitch", "youtube"] as const)("excludes disabled %s from subtitle validation and writes", async (platform) => {
+    mockStreamerbot.state[platform].tags = [platform === "twitch" ? "invalid tag" : "x".repeat(501)];
+    await boot();
+    expect(action("save-subtitle").disabled).toBe(true);
+    togglePlatform(platform);
+    expect(action("save-subtitle").disabled).toBe(false);
+    expect(action(`edit-${platform}`).disabled).toBe(true);
+    setValue('[data-input="main-subtitle"]', "Selected platform only");
+    click("save-subtitle");
+    await flush();
+    expect(commands()).not.toContain(platform === "twitch" ? "updateTwitch" : "updateYouTube");
+    expect(commands()).toContain(platform === "twitch" ? "updateYouTube" : "updateTwitch");
+    expect(document.querySelector(".notice")?.textContent ?? "").not.toContain("Пропущено");
+  });
+
+  it.each(["twitch", "youtube"] as const)("keeps disabled %s drafts and excludes title, category and tag writes in the combined editor", async (platform) => {
+    await boot();
+    click("open-all");
+    setValue('[data-input="all-subtitle"]', "Combined change");
+    setValue(`[data-input="tag-draft"][data-scope="all-${platform}"]`, "Draft");
+    togglePlatform(platform, "all");
+    expect(document.querySelector<HTMLInputElement>(`[data-input="tag-draft"][data-scope="all-${platform}"]`)?.disabled).toBe(true);
+    expect(document.querySelector<HTMLInputElement>(`[data-input="platform-enabled"][data-scope="all-${platform}"]`)?.disabled).toBe(false);
+    togglePlatform(platform, "all");
+    expect(document.querySelector<HTMLInputElement>(`[data-input="tag-draft"][data-scope="all-${platform}"]`)?.value).toBe("Draft");
+    togglePlatform(platform, "all");
+    click("save-all");
+    expect(action("save-all").disabled).toBe(true);
+    await flush();
+    expect(commands()).not.toContain(platform === "twitch" ? "updateTwitch" : "updateYouTube");
+    expect(commands()).toContain(platform === "twitch" ? "updateYouTube" : "updateTwitch");
+  });
+
+  it("prevents any save with both platforms disabled and restores selection after reopening", async () => {
+    await boot();
+    togglePlatform("twitch");
+    togglePlatform("youtube");
+    expect(action("save-subtitle").disabled).toBe(true);
+    click("open-all");
+    expect(action("save-all").disabled).toBe(true);
+    const before = mockStreamerbot.actionCalls.length;
+    click("save-all");
+    click("save-subtitle");
+    await flush();
+    expect(mockStreamerbot.actionCalls.length).toBe(before);
+    click("close-modal");
+    vi.resetModules();
+    document.body.innerHTML = '<div id="app"></div>';
+    await boot();
+    expect(document.querySelector<HTMLInputElement>('[data-scope="subtitle-twitch"]')?.checked).toBe(false);
+    expect(document.querySelector<HTMLInputElement>('[data-scope="subtitle-youtube"]')?.checked).toBe(false);
+    expect(action("save-subtitle").disabled).toBe(true);
+    togglePlatform("twitch");
+    expect(action("save-subtitle").disabled).toBe(false);
+  });
+
+  it("uses availability as well as selection and gives Twitch the correct unavailable reason", async () => {
+    mockStreamerbot.state.twitch.connected = false;
+    mockStreamerbot.state.youtube.broadcastId = "";
+    await boot();
+    expect(action("save-subtitle").disabled).toBe(true);
+    click("open-all");
+    expect(action("save-all").disabled).toBe(true);
+    expect(document.querySelectorAll(".all-platform")[0].textContent).toContain("Аккаунт не подключён");
+    expect(document.querySelectorAll(".all-platform")[0].textContent).not.toContain("Стрим YouTube");
+  });
+
+  it("does not report YouTube as skipped when explicitly disabled and offline", async () => {
+    mockStreamerbot.state.youtube.live = false;
+    await boot();
+    togglePlatform("youtube");
+    setValue('[data-input="main-subtitle"]', "Twitch only");
+    click("save-subtitle");
+    await flush();
+    expect(commands()).toContain("updateTwitch");
+    expect(document.querySelector(".notice")?.textContent ?? "").not.toContain("Пропущено");
+  });
+
   it("opens every normal editor action and keeps a modal open when an input is clicked", async () => {
     await boot();
     click("edit-twitch");

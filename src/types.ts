@@ -68,6 +68,8 @@ export interface ConnectionSettings {
   twitchTemplate: string;
   youtubeTemplate: string;
   lastSubtitle: string;
+  twitchEnabled: boolean;
+  youtubeEnabled: boolean;
 }
 
 export interface ActionSummary {
