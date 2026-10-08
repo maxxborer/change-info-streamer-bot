@@ -264,7 +264,6 @@ function iconButton(action: string, title: string, icon: string, disabled = fals
 
 function renderHeader(): string {
   return `<header class="topbar">
-    <div class="brand"><span class="brand-mark">S</span><h1>Stream Info</h1></div>
     <div class="header-actions">
       <span class="connection connection-${state.connection}"><i></i>${escapeHtml(connectionText())}</span>
       ${iconButton("refresh-state", t("refresh"), renderIcon("refresh"), state.connection !== "connected")}
